@@ -11,7 +11,7 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
 
 ## Status
 
-**Stage 2 — finder + parsers — COMPLETE**
+**Stage 3 — rule engine + DOCKER-R001 — COMPLETE**
 
 ## Tech stack (locked)
 
@@ -59,8 +59,12 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
       continuation + heredoc + directive support; Workflow: ruamel round-trip
       YAML with full line-map keyed by path tuple). Gate: 50 tests pass on
       fixture repos (good + bad), zero warnings.
-- [ ] **Stage 3** — Rule ABC + DockerStructuralRule (DOCKER-R001) + engine
-      wiring. Gate: scan bad fixture → 1 High; good fixture → 0.
+- [x] **Stage 3** — Rule ABC (`RuleHandler`, `Finding` dataclass),
+      `DockerStructuralRule` (`missing_instruction` kind), engine with
+      registry dispatched by `(target, type)`. Gracefully no-ops on unhandled
+      rule types (e.g. regex handlers added in Stage 7). Gate: 58 tests pass;
+      `repo_bad` → 2 High findings (top-level + vendor/Dockerfile); `repo_good`
+      → 0; disabled rules respected; empty repo handled.
 - [ ] **Stage 4** — WorkflowStructuralRule (GHA-R001). Gate: scan `@v4` → 1
       Medium; `@<40hex>` → 0; `@main` → 1.
 - [ ] **Stage 5** — Reporter (MD) + `scan` command end-to-end. Gate: eyeball
