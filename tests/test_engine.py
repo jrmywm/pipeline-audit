@@ -127,3 +127,46 @@ class TestEmptyRepo:
     def test_no_targets_yields_no_findings(self, tmp_path):
         (tmp_path / "README.md").write_text("hi", encoding="utf-8")
         assert scan_path(tmp_path) == []
+
+
+# ─── GHA-R001 (unpinned actions) end-to-end ──────────────────────────────────
+
+
+class TestGhaR001Engine:
+    def test_bad_repo_finds_unpinned_actions(self):
+        findings = scan_path(FIXTURES / "repo_bad")
+        gha_r001 = [
+            f for f in findings if f.rule_id == "GHA-R001"
+            and ".github" in str(f.file)
+        ]
+        # bad.yml has: checkout@v4, checkout@main (in two jobs)
+        assert len(gha_r001) == 2
+        for f in gha_r001:
+            assert f.severity == Severity.MEDIUM
+            assert f.target == "github_workflow"
+            assert f.location.line is not None
+            assert f.location.line >= 1
+
+    def test_good_repo_no_unpinned_findings(self):
+        findings = scan_path(FIXTURES / "repo_good")
+        gha_r001 = [
+            f for f in findings if f.rule_id == "GHA-R001"
+            and ".github" in str(f.file)
+        ]
+        # ci.yml pins checkout + setup-python to 40-char SHAs
+        assert gha_r001 == []
+
+    def test_finding_paths_are_workflow_files(self):
+        findings = scan_path(FIXTURES / "repo_bad")
+        gha_r001 = [f for f in findings if f.rule_id == "GHA-R001"]
+        for f in gha_r001:
+            assert f.file.name in ("bad.yml", "ci.yml")
+            assert ".github" in str(f.file)
+
+    def test_findings_snippet_contains_uses_value(self):
+        findings = scan_path(FIXTURES / "repo_bad")
+        gha_r001 = [f for f in findings if f.rule_id == "GHA-R001"]
+        snippets = " ".join(f.location.snippet or "" for f in gha_r001)
+        assert "actions/checkout" in snippets
+        # Should mention both @v4 and @main
+        assert "@v4" in snippets or "@main" in snippets

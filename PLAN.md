@@ -11,7 +11,7 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
 
 ## Status
 
-**Stage 3 — rule engine + DOCKER-R001 — COMPLETE**
+**Stage 4 — GHA-R001 unpinned actions — COMPLETE**
 
 ## Tech stack (locked)
 
@@ -65,8 +65,12 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
       rule types (e.g. regex handlers added in Stage 7). Gate: 58 tests pass;
       `repo_bad` → 2 High findings (top-level + vendor/Dockerfile); `repo_good`
       → 0; disabled rules respected; empty repo handled.
-- [ ] **Stage 4** — WorkflowStructuralRule (GHA-R001). Gate: scan `@v4` → 1
-      Medium; `@<40hex>` → 0; `@main` → 1.
+- [x] **Stage 4** — `WorkflowStructuralRule` (`uses_unpinned` kind): walks
+      `jobs.<name>.steps[]uses`, checks ref against configurable `sha_pattern`
+      (default `^[0-9a-f]{40}$`). Exempts `./local` and `docker://` actions.
+      Line numbers resolved via `workflow.line_of(("jobs",name,"steps",idx,"uses"))`
+      with progressive fallback. Gate: 75 tests pass; tag + branch + multi-job
+      fire; full SHA pinned, local, and docker actions remain silent.
 - [ ] **Stage 5** — Reporter (MD) + `scan` command end-to-end. Gate: eyeball
       `audit_report.md` on bad fixture.
 - [ ] **Stage 5b** — JSON + SARIF emitters; `--format` multi-flag. Gate: SARIF

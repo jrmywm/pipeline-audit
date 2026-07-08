@@ -9,9 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@a5b87c454f90bf1f61f5e3c4e4c5d8b9b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6
+      - uses: actions/checkout@a5b87c454f90bf1f61f5e3c4e4c5d8b9b1c2d3e4
       - name: Set up Python
-        uses: actions/setup-python@0c8b1bf1f3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+        uses: actions/setup-python@0c8b1bf1f3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8
         with:
           python-version: "3.12"
       - name: Install
