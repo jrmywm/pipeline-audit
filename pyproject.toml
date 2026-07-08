@@ -45,6 +45,9 @@ Issues = "https://github.com/TODO/pipeline-audit/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["pipeline_audit"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"pipeline_audit/rulesets" = "pipeline_audit/rulesets"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"

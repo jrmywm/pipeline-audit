@@ -1,0 +1,86 @@
+version: "1.0"
+metadata:
+  name: default
+  description: >
+    Core DevSecOps pipeline audit signatures for Dockerfiles and GitHub
+    Actions workflows.
+  author: pipeline-auditors
+
+rules:
+  # ─── DOCKER-R001 ─────────────────────────────────────────────────────────
+  - id: DOCKER-R001
+    title: Container runs as root (no USER directive)
+    severity: High
+    target: dockerfile
+    type: structural
+    match:
+      structural:
+        kind: missing_instruction
+        instruction: USER
+    remediation: >
+      Add a USER instruction near the end of the Dockerfile to specify a
+      non-root user, e.g. `USER 1001` or `USER appuser`.
+    references:
+      - https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user
+
+  # ─── DOCKER-R002 ─────────────────────────────────────────────────────────
+  - id: DOCKER-R002
+    title: Hardcoded secret in ENV or ARG instruction
+    severity: Critical
+    target: dockerfile
+    type: regex
+    match:
+      regex:
+        pattern: |
+          (?i)\b(?:ENV|ARG)\s+\S*(?:TOKEN|KEY|PASSWORD|SECRET|PASSWD|PWD|API_KEY|CREDENTIAL)[=\s]+(\S+)
+        exclude_names:
+          - NODE_ENV
+          - BUILD_NUMBER
+          - PATH
+          - HOME
+          - LANG
+          - LC_ALL
+        min_entropy: 3.5
+        capture_group: 1
+    remediation: >
+      Move secrets out of the image layer. Inject at runtime via Vault,
+      GitHub secrets, docker secrets, or SOPS-encrypted files.
+    references:
+      - https://docs.github.com/en/actions/security-guides/encrypted-secrets
+
+  # ─── GHA-R001 ────────────────────────────────────────────────────────────
+  - id: GHA-R001
+    title: Unpinned GitHub Action (uses tag or branch instead of SHA)
+    severity: Medium
+    target: github_workflow
+    type: structural
+    match:
+      structural:
+        kind: uses_unpinned
+        sha_pattern: "^[0-9a-f]{40}$"
+    remediation: >
+      Pin the action to a full 40-character commit SHA instead of a tag
+      or branch reference, e.g. `uses: actions/checkout@<40-hex-sha>`.
+    references:
+      - https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions
+
+  # ─── GHA-R002 ────────────────────────────────────────────────────────────
+  - id: GHA-R002
+    title: GitHub secret interpolated into inline bash script
+    severity: High
+    target: github_workflow
+    type: regex
+    match:
+      regex:
+        pattern: '\$\{\{\s*secrets\.[A-Za-z0-9_]+\s*\}\}'
+        scope_keys:
+          - run
+          - script
+        exclude_keys:
+          - env
+    remediation: >
+      Pass secrets to the step via the `env:` mapping and reference them as
+      `$VAR_NAME` inside the bash script. Never interpolate `${{ secrets.* }}`
+      directly into a run block.
+    references:
+      - https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-secrets-securely

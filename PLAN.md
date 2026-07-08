@@ -11,7 +11,7 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
 
 ## Status
 
-**Stage 0 — skeleton — IN PROGRESS**
+**Stage 1 — ruleset loader — COMPLETE**
 
 ## Tech stack (locked)
 
@@ -51,9 +51,9 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
 - [x] **Stage 0** — Skeleton: pyproject.toml, package tree, cli stub, PLAN.md,
       LICENSE, README.md. Gate: `pipx install -e .` + `pipeline-audit --help`
       works; `pytest` runs 0/0.
-- [ ] **Stage 1** — Ruleset loader + JSON Schema + `default.yaml` (only
-      DOCKER-R001 populated, others stubbed). Gate: load test passes; malformed
-      YAML raises `RulesetValidationError`.
+- [x] **Stage 1** — Ruleset loader + JSON Schema + `default.yaml` (all 4 rules
+      present, real match configs). Gate: 17 tests pass; schema validation +
+      merge + error paths all tested.
 - [ ] **Stage 2** — Finder (pathspec-aware) + parsers (Dockerfile line-tuples,
       Workflow ruamel+line-map). Gate: fixture parse tests pass.
 - [ ] **Stage 3** — Rule ABC + DockerStructuralRule (DOCKER-R001) + engine

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pipeline-audit.dev/ruleset/v1",
+  "title": "Pipeline-Audit Ruleset",
+  "description": "Schema for externalized DevSecOps detection rules",
+  "type": "object",
+  "required": ["version", "rules"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Ruleset format version (SemVer)"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata about the ruleset",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "author": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "rules": {
+      "type": "array",
+      "description": "Detection rules",
+      "items": { "$ref": "#/$defs/rule" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": ["id", "title", "severity", "target", "type", "match", "remediation"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(DOCKER|GHA)-R\\d{3}$",
+          "description": "Unique rule identifier in the form DOCKER-R001 or GHA-R001"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short human-readable rule title"
+        },
+        "severity": {
+          "enum": ["Critical", "High", "Medium", "Low"],
+          "description": "Finding severity level"
+        },
+        "target": {
+          "enum": ["dockerfile", "github_workflow"],
+          "description": "Which file type this rule applies to"
+        },
+        "type": {
+          "enum": ["structural", "regex", "composite"],
+          "description": "Match strategy: structural (semantic), regex (pattern), or composite (both)"
+        },
+        "match": {
+          "type": "object",
+          "description": "Rule-specific match configuration. Structure depends on 'type'. The engine interprets this per rule-type.",
+          "additionalProperties": true
+        },
+        "remediation": {
+          "type": "string",
+          "description": "Recommended fix for findings produced by this rule"
+        },
+        "references": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional reference URLs"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "If false, the rule is loaded but skipped by the engine"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
