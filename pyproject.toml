@@ -9,7 +9,7 @@ description = "Headless DevSecOps pipeline audit — SAST scanner for CI/CD conf
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-authors = [{ name = "TODO", email = "todo@example.com" }]
+authors = [{ name = "Jeremy Wijanarko Mulyono", email = "jeremywmul@gmail.com" }]
 keywords = ["security", "sast", "devsecops", "github-actions", "docker", "ci-cd"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -39,8 +39,8 @@ dev = [
 pipeline-audit = "pipeline_audit.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/TODO/pipeline-audit"
-Issues = "https://github.com/TODO/pipeline-audit/issues"
+Homepage = "https://github.com/jrmywm/pipeline-audit"
+Issues = "https://github.com/jrmywm/pipeline-audit/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipeline_audit"]

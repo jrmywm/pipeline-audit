@@ -91,7 +91,7 @@ def render_sarif(findings: list[Finding], *, root: Path | None = None) -> str:
                     "driver": {
                         "name": "pipeline-audit",
                         "version": __version__,
-                        "informationUri": "https://github.com/TODO/pipeline-audit",
+                        "informationUri": "https://github.com/jrmywm/pipeline-audit",
                         "rules": list(rules_index.values()),
                     }
                 },
