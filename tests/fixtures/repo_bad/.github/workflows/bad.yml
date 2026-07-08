@@ -1,0 +1,23 @@
+name: CI (bad)
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dirty secret use
+        run: |
+          echo "Deploying with token ${{ secrets.DEPLOY_TOKEN }}"
+          curl -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" https://example.com
+      - name: Safe env pass
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+        run: |
+          curl -H "Authorization: Bearer $TOKEN" https://example.com
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - run: npm test

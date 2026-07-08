@@ -11,7 +11,7 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
 
 ## Status
 
-**Stage 1 — ruleset loader — COMPLETE**
+**Stage 2 — finder + parsers — COMPLETE**
 
 ## Tech stack (locked)
 
@@ -54,8 +54,11 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
 - [x] **Stage 1** — Ruleset loader + JSON Schema + `default.yaml` (all 4 rules
       present, real match configs). Gate: 17 tests pass; schema validation +
       merge + error paths all tested.
-- [ ] **Stage 2** — Finder (pathspec-aware) + parsers (Dockerfile line-tuples,
-      Workflow ruamel+line-map). Gate: fixture parse tests pass.
+- [x] **Stage 2** — Finder (pathspec-aware, .gitignore + node_modules + custom
+      gitignore-include detection) + parsers (Dockerfile: line-tuples with
+      continuation + heredoc + directive support; Workflow: ruamel round-trip
+      YAML with full line-map keyed by path tuple). Gate: 50 tests pass on
+      fixture repos (good + bad), zero warnings.
 - [ ] **Stage 3** — Rule ABC + DockerStructuralRule (DOCKER-R001) + engine
       wiring. Gate: scan bad fixture → 1 High; good fixture → 0.
 - [ ] **Stage 4** — WorkflowStructuralRule (GHA-R001). Gate: scan `@v4` → 1
