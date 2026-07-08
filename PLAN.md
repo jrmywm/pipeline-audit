@@ -11,7 +11,7 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
 
 ## Status
 
-**Stage 4 — GHA-R001 unpinned actions — COMPLETE**
+**Stage 5 — MD reporter + scan CLI wired — COMPLETE**
 
 ## Tech stack (locked)
 
@@ -71,8 +71,16 @@ Aggregates findings by file + severity → `audit_report.md` (plus JSON/SARIF).
       Line numbers resolved via `workflow.line_of(("jobs",name,"steps",idx,"uses"))`
       with progressive fallback. Gate: 75 tests pass; tag + branch + multi-job
       fire; full SHA pinned, local, and docker actions remain silent.
-- [ ] **Stage 5** — Reporter (MD) + `scan` command end-to-end. Gate: eyeball
-      `audit_report.md` on bad fixture.
+- [x] **Stage 5** — `reporter.py` (Markdown): aggregates findings by file then
+      severity, summary table, file-grouped findings tables, per-finding
+      Details section with remediation + references. Paths normalized to posix
+      for cross-platform consistent reports. `cli.py scan` upgraded from stub
+      to real end-to-end: invokes engine, prints Rich console summary table,
+      writes MD report (auto-creates parent dirs), honors `--fail-on` exit
+      policy, defers `--format json|sarif` to Stage 5b. Gate: 99 tests pass;
+      sample reports eyeballed on `repo_good` (0 findings, clean message) and
+      `repo_bad` (4 findings: 2 High DOCKER-R001 + 2 Medium GHA-R001); exit
+      codes verified (0 clean / 0 with findings / 1 with `--fail-on High`).
 - [ ] **Stage 5b** — JSON + SARIF emitters; `--format` multi-flag. Gate: SARIF
       validates against schema; upload to throwaway repo Code Scanning succeeds.
 - [ ] **Stage 6** — Snapshot fixtures (20 snippets) + `expected.yaml` (AI draft,
