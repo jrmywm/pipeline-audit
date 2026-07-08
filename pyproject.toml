@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pipeline-audit"
+version = "0.1.0a1"
+description = "Headless DevSecOps pipeline audit — SAST scanner for CI/CD configs"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "TODO", email = "todo@example.com" }]
+keywords = ["security", "sast", "devsecops", "github-actions", "docker", "ci-cd"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "click>=8.1",
+    "rich>=13.7",
+    "ruamel.yaml>=0.18",
+    "jsonschema>=4.20",
+    "pathspec>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+]
+
+[project.scripts]
+pipeline-audit = "pipeline_audit.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/TODO/pipeline-audit"
+Issues = "https://github.com/TODO/pipeline-audit/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pipeline_audit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
