@@ -1,0 +1,115 @@
+# Ground truth for pipeline-audit snapshot validation.
+# Drafted by AI per Option B — user review/veto required before v1.
+#
+# Each snapshot lists expected findings by (rule_id, file).
+# validate.py compares actual findings against these expectations
+# and computes precision + recall per rule.
+#
+# Convention:
+#   expected: []  → no findings should fire (true negative)
+#   expected: [{rule_id, file, severity}]  → true positive(s)
+
+version: "1.0"
+snapshots:
+  # ─── Docker snapshots (01–10) ─────────────────────────────────────────────
+  01_docker_no_user:
+    description: "Dockerfile without USER — runs as root"
+    expected:
+      - rule_id: DOCKER-R001
+        file: Dockerfile
+        severity: High
+  02_docker_with_user:
+    description: "Dockerfile with USER appuser"
+    expected: []
+  03_docker_user_last:
+    description: "Dockerfile with USER 1001 at the end"
+    expected: []
+  04_docker_user_numeric:
+    description: "Dockerfile with USER 1001 early"
+    expected: []
+  05_docker_multi_stage_no_user:
+    description: "Multi-stage Dockerfile, no USER in final stage"
+    expected:
+      - rule_id: DOCKER-R001
+        file: Dockerfile
+        severity: High
+  06_docker_multi_stage_with_user:
+    description: "Multi-stage Dockerfile, USER 1001 in final stage"
+    expected: []
+  07_docker_directive_no_user:
+    description: "Dockerfile with # syntax directive but no USER"
+    expected:
+      - rule_id: DOCKER-R001
+        file: Dockerfile
+        severity: High
+  08_docker_heredoc_no_user:
+    description: "Dockerfile with heredoc RUN, no USER"
+    expected:
+      - rule_id: DOCKER-R001
+        file: Dockerfile
+        severity: High
+  09_docker_only_from:
+    description: "Minimal Dockerfile: FROM scratch only"
+    expected:
+      - rule_id: DOCKER-R001
+        file: Dockerfile
+        severity: High
+  10_docker_arg_user:
+    description: "Dockerfile with ARG then USER $UID"
+    expected: []
+
+  # ─── GHA snapshots (11–20) ────────────────────────────────────────────────
+  11_gha_tag_v4:
+    description: "Workflow with actions/checkout@v4"
+    expected:
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+  12_gha_tag_v3_specific:
+    description: "Workflow with @v3.2.1 and @v5 (both tag-pinned)"
+    expected:
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+  13_gha_sha_pinned:
+    description: "Workflow with both actions SHA-pinned"
+    expected: []
+  14_gha_branch_main:
+    description: "Workflow with actions/checkout@main"
+    expected:
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+  15_gha_local_action:
+    description: "Workflow using ./local-action (exempt)"
+    expected: []
+  16_gha_docker_action:
+    description: "Workflow using docker://alpine:3.19 (exempt)"
+    expected: []
+  17_gha_mixed:
+    description: "Workflow with 1 SHA-pinned + 1 tag-pinned (1 finding)"
+    expected:
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+  18_gha_multi_job_unpinned:
+    description: "2 jobs with 3 unpinned uses total"
+    expected:
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+      - rule_id: GHA-R001
+        file: ci.yml
+        severity: Medium
+  19_gha_all_sha_pinned:
+    description: "Workflow with both actions SHA-pinned"
+    expected: []
+  20_gha_no_uses_steps:
+    description: "Workflow with only run: steps, no uses:"
+    expected: []
