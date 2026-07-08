@@ -34,3 +34,6 @@ Thumbs.db
 audit_report.md
 audit_report.json
 audit_report.sarif
+
+# Local planning doc (kept locally for AI context, not pushed)
+PLAN.md
