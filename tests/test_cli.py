@@ -104,12 +104,38 @@ class TestFormatFlag:
         assert result.exit_code == 0
         assert out.is_file()
 
-    def test_json_format_warns_not_implemented(self, tmp_path):
+    def test_json_format_writes_file(self, tmp_path):
         runner = CliRunner()
+        out = tmp_path / "report.md"
         result = runner.invoke(
             main,
-            ["scan", str(FIXTURES / "repo_good"), "--format", "json"],
+            ["scan", str(FIXTURES / "repo_bad"), "--format", "json", "--output", str(out)],
         )
-        # Should still exit 0 (md not requested)
         assert result.exit_code == 0
-        assert "not implemented" in result.output
+        json_path = tmp_path / "report.json"
+        assert json_path.is_file()
+
+    def test_sarif_format_writes_file(self, tmp_path):
+        runner = CliRunner()
+        out = tmp_path / "report.md"
+        result = runner.invoke(
+            main,
+            ["scan", str(FIXTURES / "repo_bad"), "--format", "sarif", "--output", str(out)],
+        )
+        assert result.exit_code == 0
+        sarif_path = tmp_path / "report.sarif"
+        assert sarif_path.is_file()
+
+    def test_multi_format_writes_all_files(self, tmp_path):
+        runner = CliRunner()
+        out = tmp_path / "scan.md"
+        result = runner.invoke(
+            main,
+            ["scan", str(FIXTURES / "repo_bad"),
+             "--format", "md", "--format", "json", "--format", "sarif",
+             "--output", str(out)],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / "scan.md").is_file()
+        assert (tmp_path / "scan.json").is_file()
+        assert (tmp_path / "scan.sarif").is_file()

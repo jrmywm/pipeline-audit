@@ -1,0 +1,75 @@
+{
+  "schema": "pipeline-audit/v1",
+  "generated_at": "2026-07-08T15:57:58+00:00",
+  "summary": {
+    "total": 4,
+    "by_severity": {
+      "Critical": 0,
+      "High": 2,
+      "Medium": 2,
+      "Low": 0
+    }
+  },
+  "findings": [
+    {
+      "rule_id": "GHA-R001",
+      "title": "Unpinned GitHub Action (uses tag or branch instead of SHA)",
+      "severity": "Medium",
+      "target": "github_workflow",
+      "file": ".github/workflows/bad.yml",
+      "line": 9,
+      "end_line": null,
+      "column": null,
+      "snippet": "uses: actions/checkout@v4",
+      "remediation": "Pin the action to a full 40-character commit SHA instead of a tag or branch reference, e.g. `uses: actions/checkout@<40-hex-sha>`.",
+      "references": [
+        "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions"
+      ]
+    },
+    {
+      "rule_id": "GHA-R001",
+      "title": "Unpinned GitHub Action (uses tag or branch instead of SHA)",
+      "severity": "Medium",
+      "target": "github_workflow",
+      "file": ".github/workflows/bad.yml",
+      "line": 22,
+      "end_line": null,
+      "column": null,
+      "snippet": "uses: actions/checkout@main",
+      "remediation": "Pin the action to a full 40-character commit SHA instead of a tag or branch reference, e.g. `uses: actions/checkout@<40-hex-sha>`.",
+      "references": [
+        "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions"
+      ]
+    },
+    {
+      "rule_id": "DOCKER-R001",
+      "title": "Container runs as root (no USER directive)",
+      "severity": "High",
+      "target": "dockerfile",
+      "file": "Dockerfile",
+      "line": 1,
+      "end_line": 12,
+      "column": null,
+      "snippet": "# syntax=docker/dockerfile:1.6",
+      "remediation": "Add a USER instruction near the end of the Dockerfile to specify a non-root user, e.g. `USER 1001` or `USER appuser`.",
+      "references": [
+        "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user"
+      ]
+    },
+    {
+      "rule_id": "DOCKER-R001",
+      "title": "Container runs as root (no USER directive)",
+      "severity": "High",
+      "target": "dockerfile",
+      "file": "vendor/Dockerfile",
+      "line": 1,
+      "end_line": 2,
+      "column": null,
+      "snippet": "FROM scratch",
+      "remediation": "Add a USER instruction near the end of the Dockerfile to specify a non-root user, e.g. `USER 1001` or `USER appuser`.",
+      "references": [
+        "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user"
+      ]
+    }
+  ]
+}

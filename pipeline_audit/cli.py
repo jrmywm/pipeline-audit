@@ -7,7 +7,9 @@ from rich.table import Table
 
 from pipeline_audit import __version__
 from pipeline_audit.core.engine import scan_path
+from pipeline_audit.core.json_emitter import render_json
 from pipeline_audit.core.reporter import render_markdown
+from pipeline_audit.core.sarif_emitter import render_sarif
 from pipeline_audit.core.severity import Severity
 
 console = Console()
@@ -62,17 +64,22 @@ def scan(path: Path, output: str, fmts: tuple[str, ...], ruleset: Path | None, f
 
     # Emit requested formats
     wrote_outputs: list[str] = []
+    out_stem = Path(output)
     for fmt in fmts:
         if fmt == "md":
-            md = render_markdown(findings, root=root)
-            out_path = Path(output)
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(md, encoding="utf-8")
-            wrote_outputs.append(str(out_path))
-        elif fmt in ("json", "sarif"):
-            err_console.print(
-                f"[yellow]--format {fmt} not implemented yet (Stage 5b).[/yellow]"
-            )
+            content = render_markdown(findings, root=root)
+            out_path = out_stem if out_stem.suffix.lower() == ".md" else out_stem.with_suffix(".md")
+        elif fmt == "json":
+            content = render_json(findings, root=root)
+            out_path = out_stem.with_suffix(".json")
+        elif fmt == "sarif":
+            content = render_sarif(findings, root=root)
+            out_path = out_stem.with_suffix(".sarif")
+        else:
+            continue
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(content, encoding="utf-8")
+        wrote_outputs.append(str(out_path))
 
     for o in wrote_outputs:
         console.print(f"  report written to [cyan]{o}[/cyan]")
