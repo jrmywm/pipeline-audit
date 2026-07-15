@@ -1,0 +1,12 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+        run: |
+          echo "token is $TOKEN"
+          curl -H "Auth: Bearer ${{ secrets.TOKEN_STREAM }}" https://example.com

@@ -31,7 +31,7 @@ rules:
     type: regex
     match:
       regex:
-        pattern: |
+        pattern: |-
           (?i)\b(?:ENV|ARG)\s+\S*(?:TOKEN|KEY|PASSWORD|SECRET|PASSWD|PWD|API_KEY|CREDENTIAL)[=\s]+(\S+)
         exclude_names:
           - NODE_ENV

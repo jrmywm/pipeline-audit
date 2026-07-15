@@ -1,0 +1,4 @@
+FROM alpine:3.19
+ENV API_KEY=abc
+USER 1001
+CMD ["sh"]

@@ -1,0 +1,8 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: echo "Deploying ${{ secrets.DEPLOY_KEY }}"

@@ -1,0 +1,5 @@
+FROM alpine:3.19
+ARG PASSWORD=hDx8Vn4KpR2Lm9SzTqFy6BvWcJ3MqNeP
+RUN echo hi
+USER 1001
+CMD ["sh"]

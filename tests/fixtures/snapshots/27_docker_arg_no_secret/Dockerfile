@@ -1,0 +1,6 @@
+FROM alpine:3.19
+ARG VERSION=1.0
+ARG UID=1001
+RUN echo hi
+USER $UID
+CMD ["sh"]

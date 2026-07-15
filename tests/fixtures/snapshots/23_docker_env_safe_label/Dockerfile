@@ -1,0 +1,7 @@
+FROM node:20
+ENV NODE_ENV=production
+ENV BUILD_NUMBER=42
+ENV LANG=C.UTF-8
+WORKDIR /app
+USER 1001
+CMD ["node"]

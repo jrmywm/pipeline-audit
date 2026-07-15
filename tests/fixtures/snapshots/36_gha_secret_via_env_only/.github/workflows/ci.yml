@@ -1,0 +1,13 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          echo "token is $TOKEN"
+          curl -H "Auth: Bearer $DEPLOY_KEY" https://example.com

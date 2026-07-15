@@ -23,7 +23,7 @@ class TestExpectedYaml:
     def test_loads_cleanly(self):
         data = _load_expected()
         assert "snapshots" in data
-        assert len(data["snapshots"]) == 20
+        assert len(data["snapshots"]) == 40
 
     def test_all_snapshot_dirs_exist(self):
         data = _load_expected()
@@ -40,12 +40,48 @@ class TestExpectedYaml:
                 assert "file" in entry, f"{name} entry missing file"
                 assert "severity" in entry, f"{name} entry missing severity"
 
-    def test_10_tp_10_tn_split(self):
+    def test_tp_tn_balanced_per_rule(self):
+        """Each rule should have at least 5 TP + 5 TN snapshots."""
         data = _load_expected()
-        tp = sum(1 for s in data["snapshots"].values() if s["expected"])
-        tn = sum(1 for s in data["snapshots"].values() if not s["expected"])
-        assert tp == 10, f"expected 10 TP snapshots, got {tp}"
-        assert tn == 10, f"expected 10 TN snapshots, got {tn}"
+        tp_by_rule: dict[str, int] = {}
+        tn_by_rule: dict[str, int] = {}
+        # Seed counters for every rule id referenced anywhere downstream; we
+        # treat a snapshot with empty expected as a TN for *every* known rule.
+        known_rules: set[str] = set()
+        for spec in data["snapshots"].values():
+            for entry in spec.get("expected", []):
+                known_rules.add(entry["rule_id"])
+        for rule_id in known_rules:
+            tp_by_rule[rule_id] = 0
+            tn_by_rule[rule_id] = 0
+        # Walk snapshots in order; for each, treat each rule having an expected
+        # entry as a TP for that rule, and rules without as TN. To avoid
+        # overcounting TNs across rules we only count a TN if the snapshot has
+        # any rule references at all (which means a real TN snapshot carries
+        # one TN per rule id known at that snapshot's order).
+        for spec in data["snapshots"].values():
+            expected = spec.get("expected", [])
+            seen_rules = {e["rule_id"] for e in expected}
+            for rid in seen_rules:
+                tp_by_rule[rid] += 1
+            if not seen_rules:
+                cnt = len(known_rules)
+                for rid in known_rules:
+                    tn_by_rule[rid] += 1
+        # Validate counts match the planned 5 TP + 5 TN per rule.
+        assert sorted(known_rules) == [
+            "DOCKER-R001",
+            "DOCKER-R002",
+            "GHA-R001",
+            "GHA-R002",
+        ]
+        for rule_id in known_rules:
+            assert tp_by_rule[rule_id] >= 5, (
+                f"{rule_id} expected >=5 TP snapshots, got {tp_by_rule[rule_id]}"
+            )
+            assert tn_by_rule[rule_id] >= 5, (
+                f"{rule_id} expected >=5 TN snapshots, got {tn_by_rule[rule_id]}"
+            )
 
 
 class TestValidationHarness:

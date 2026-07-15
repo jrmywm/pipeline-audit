@@ -106,10 +106,10 @@ class TestUnhandledRuleType:
             "    title: x\n"
             "    severity: Critical\n"
             "    target: dockerfile\n"
-            "    type: regex\n"  # no handler yet (Stage 7)
+            "    type: composite\n"  # no handler yet (Stage 8+)
             "    match:\n"
             "      regex:\n"
-            "        pattern: 'ENV'\n"
+            "        pattern: ENV\n"
             "    remediation: r\n",
             encoding="utf-8",
         )

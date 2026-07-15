@@ -13,15 +13,19 @@ from pipeline_audit.core.parser import (
 from pipeline_audit.core.rule_base import Finding, RuleHandler
 from pipeline_audit.core.rule_loader import Rule as RuleSpec, load_merged_ruleset
 from pipeline_audit.core.docker_rule import DockerStructuralRule
+from pipeline_audit.core.docker_regex_rule import DockerRegexRule
 from pipeline_audit.core.workflow_rule import WorkflowStructuralRule
+from pipeline_audit.core.workflow_regex_rule import WorkflowRegexRule
 
 
 # Registry: maps (target, type) -> RuleHandler instance
 # Handlers are stateless; one instance per (target, type) key is fine.
 _REGISTRY: dict[tuple[str, str], RuleHandler] = {
     ("dockerfile", "structural"): DockerStructuralRule(),
+    ("dockerfile", "regex"): DockerRegexRule(),
     ("github_workflow", "structural"): WorkflowStructuralRule(),
-    # dockerfile regex, github_workflow regex -> Stage 7+
+    ("github_workflow", "regex"): WorkflowRegexRule(),
+    # composite handlers added when first composite rule lands (v1.1+)
 }
 
 

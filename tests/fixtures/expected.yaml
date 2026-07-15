@@ -113,3 +113,97 @@ snapshots:
   20_gha_no_uses_steps:
     description: "Workflow with only run: steps, no uses:"
     expected: []
+
+  # ─── DOCKER-R002 snapshots (21–30) ───────────────────────────────────────
+  21_docker_env_secret:
+    description: "Dockerfile with ENV API_KEY=high-entropy secret value"
+    expected:
+      - rule_id: DOCKER-R002
+        file: Dockerfile
+        severity: Critical
+  22_docker_arg_secret:
+    description: "Dockerfile with ARG GITHUB_TOKEN=high-entropy secret value"
+    expected:
+      - rule_id: DOCKER-R002
+        file: Dockerfile
+        severity: Critical
+  23_docker_env_safe_label:
+    description: "Dockerfile with only allowlisted ENV names (NODE_ENV, BUILD_NUMBER, LANG)"
+    expected: []
+  24_docker_env_low_entropy:
+    description: "Dockerfile with ENV API_KEY=abc (entropy below 3.5 floor)"
+    expected: []
+  25_docker_env_mixed:
+    description: "Dockerfile with NODE_ENV (safe) + API_TOKEN (secret, high entropy) + OTHER_FLAG (no keyword)"
+    expected:
+      - rule_id: DOCKER-R002
+        file: Dockerfile
+        severity: Critical
+  26_docker_arg_secret:
+    description: "Dockerfile with ARG PASSWORD=high-entropy secret value"
+    expected:
+      - rule_id: DOCKER-R002
+        file: Dockerfile
+        severity: Critical
+  27_docker_arg_no_secret:
+    description: "Dockerfile with ARG VERSION/UID only, no secret-keyword names"
+    expected: []
+  28_docker_env_keyword_substring:
+    description: "Dockerfile with ENV SECRETAPI_KEY=high-entropy (name contains KEY substring)"
+    expected:
+      - rule_id: DOCKER-R002
+        file: Dockerfile
+        severity: Critical
+  29_docker_env_no_secret_keyword:
+    description: "Dockerfile with ENV APP_VERSION/BUILD_LABEL (no secret-keyword in name)"
+    expected: []
+  30_docker_env_var_substitution:
+    description: "Dockerfile with ENV API_KEY={{EV_VAR}} (low-entropy placeholder values)"
+    expected: []
+
+  # ─── GHA-R002 snapshots (31–40) ───────────────────────────────────────────
+  31_gha_secret_inline_run:
+    description: "Workflow interpolating ${{ secrets.DEPLOY_KEY }} into an inline run:"
+    expected:
+      - rule_id: GHA-R002
+        file: ci.yml
+        severity: High
+  32_gha_secret_spaced_run:
+    description: "Workflow with ${{   secrets.API_TOKEN   }} (extra whitespace) in run"
+    expected:
+      - rule_id: GHA-R002
+        file: ci.yml
+        severity: High
+  33_gha_secret_block_scalar_run:
+    description: "Workflow with block scalar run: | interpolating ${{ secrets.SECRET_TOKEN }}"
+    expected:
+      - rule_id: GHA-R002
+        file: ci.yml
+        severity: High
+  34_gha_secret_script_scope:
+    description: "Workflow with step-level script: key interpolating ${{ secrets.SCRIPT_TOKEN }}"
+    expected:
+      - rule_id: GHA-R002
+        file: ci.yml
+        severity: High
+  35_gha_secret_env_then_run:
+    description: "Workflow with env-passed secret (TN) + run interpolation of ${{ secrets.TOKEN_STREAM }} (TP)"
+    expected:
+      - rule_id: GHA-R002
+        file: ci.yml
+        severity: High
+  36_gha_secret_via_env_only:
+    description: "Workflow passes secrets via env: mapping only (recommended pattern)"
+    expected: []
+  37_gha_run_env_var_ref:
+    description: "Workflow run: references $HOME and make build (no secrets interpolation)"
+    expected: []
+  38_gha_run_no_secrets:
+    description: "Workflow with run: make build and run: pytest -q (no secrets interpolated)"
+    expected: []
+  39_gha_no_secrets_at_all:
+    description: "Workflow with no ${{ secrets.* }} tokens anywhere"
+    expected: []
+  40_gha_empty_run_block:
+    description: "Workflow with run: \"\" empty string step"
+    expected: []

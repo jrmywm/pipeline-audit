@@ -1,0 +1,10 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: |
+          curl -H "Authorization: Bearer ${{ secrets.SECRET_TOKEN }}" https://example.com
+          echo "done"

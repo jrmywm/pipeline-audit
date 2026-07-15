@@ -1,0 +1,8 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run script
+        script: console.log("${{ secrets.SCRIPT_TOKEN }}")
