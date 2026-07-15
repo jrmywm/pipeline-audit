@@ -74,6 +74,33 @@ class TestGitignore:
         assert not any(p.name == "ci.yml" for p in paths), "ci.yml should be gitignored"
 
 
+# ─── excluded directory names ───────────────────────────────────────────────
+
+
+class TestExcludedDirs:
+    @pytest.mark.parametrize("dirname", ["test", "tests", "__tests__"])
+    def test_test_dirs_excluded(self, tmp_path, dirname):
+        d = tmp_path / dirname
+        d.mkdir()
+        (d / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+        targets = find_audit_targets(tmp_path)
+        assert not any(p.name == "Dockerfile" for p, _ in targets)
+
+    def test_node_modules_excluded(self, tmp_path):
+        d = tmp_path / "node_modules"
+        d.mkdir()
+        (d / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+        targets = find_audit_targets(tmp_path)
+        assert not any(p.name == "Dockerfile" for p, _ in targets)
+
+    def test_non_test_dir_not_excluded(self, tmp_path):
+        d = tmp_path / "dockerfiles"
+        d.mkdir()
+        (d / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+        targets = find_audit_targets(tmp_path)
+        assert any(p.name == "Dockerfile" for p, _ in targets)
+
+
 # ─── directory error ────────────────────────────────────────────────────────
 
 

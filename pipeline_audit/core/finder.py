@@ -16,6 +16,15 @@ WORKFLOW_DIR_GLOBS = [".github/workflows", ".gitea/workflows", ".gitlab/workflow
 DOCKERFILE_NAMES = {"dockerfile"}
 MAX_FILE_BYTES = 1_048_576  # 1 MiB cap to avoid giant generated files
 
+# Directory names that are never scanned — test fixtures, vendored code, caches.
+# Checked against any path component in the relative path from scan root.
+EXCLUDED_DIR_NAMES = {
+    "node_modules",
+    "test",
+    "tests",
+    "__tests__",
+}
+
 
 def _load_gitignore(root: Path) -> pathspec.PathSpec | None:
     gi = root / ".gitignore"
@@ -81,14 +90,15 @@ def find_audit_targets(root: Path) -> list[tuple[Path, FileKind]]:
         if _is_ignored(rel, spec):
             continue
 
+        rel_parts_lower = [p.lower() for p in rel.parts[:-1]]
+        if any(part in EXCLUDED_DIR_NAMES for part in rel_parts_lower):
+            continue
+
         if _is_workflow_file(path) and _workflow_dir_match(rel):
             targets.append((path, FileKind.GITHUB_WORKFLOW))
             continue
 
         if _looks_like_dockerfile(path):
-            rel_parts_lower = [p.lower() for p in rel.parts[:-1]]
-            if "node_modules" in rel_parts_lower:
-                continue
             targets.append((path, FileKind.DOCKERFILE))
 
     targets.sort(key=lambda t: str(t[0]))
