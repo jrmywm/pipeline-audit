@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pipeline-audit"
-version = "0.1.0a1"
+version = "1.0.0"
 description = "Headless DevSecOps pipeline audit — SAST scanner for CI/CD configs"
 readme = "README.md"
 license = "MIT"
@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 authors = [{ name = "Jeremy Wijanarko Mulyono", email = "jeremywmul@gmail.com" }]
 keywords = ["security", "sast", "devsecops", "github-actions", "docker", "ci-cd"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",

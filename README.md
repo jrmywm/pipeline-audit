@@ -97,7 +97,7 @@ all 4 rules.
 
 ## Status
 
-Pre-alpha. See [PLAN.md](./PLAN.md) for full architecture and roadmap.
+v1.0.0. See [PLAN.md](./PLAN.md) for full architecture and roadmap.
 
 ## License
 
