@@ -1,4 +1,10 @@
 """Headless DevSecOps pipeline audit — SAST for CI/CD configs."""
 
-__version__ = "0.1.0a1"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("pipeline-audit")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
+
 __all__ = ["__version__"]
