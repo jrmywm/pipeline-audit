@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from pathlib import Path
 
 from pipeline_audit.core.location import Location
@@ -60,22 +61,28 @@ class DockerRegexRule(RuleHandler):
         capture_group = int(regex_cfg.get("capture_group", _DEFAULT_CAPTURE_GROUP))
 
         findings: list[Finding] = []
+        seen: set[tuple[int, str]] = set()
         for inst in dockerfile.instructions:
             if inst.is_directive:
                 continue
             if inst.instruction_upper not in _ENV_INSTRUCTIONS:
                 continue
-            for m in pattern.finditer(inst.raw):
-                self._evaluate_match(
-                    spec,
-                    file=file,
-                    instruction=inst,
-                    match=m,
-                    capture_group=capture_group,
-                    exclude_names=exclude_names,
-                    min_entropy=min_entropy,
-                    findings=findings,
-                )
+            candidates = [(inst.raw, inst.line)]
+            candidates.extend((candidate, inst.line) for candidate in _assignment_candidates(inst))
+            for candidate, candidate_line in candidates:
+                for m in pattern.finditer(candidate):
+                    self._evaluate_match(
+                        spec,
+                        file=file,
+                        instruction=inst,
+                        match=m,
+                        line=candidate_line,
+                        capture_group=capture_group,
+                        exclude_names=exclude_names,
+                        min_entropy=min_entropy,
+                        findings=findings,
+                        seen=seen,
+                    )
         return findings
 
     def _evaluate_match(
@@ -85,10 +92,12 @@ class DockerRegexRule(RuleHandler):
         file: Path,
         instruction,
         match,
+        line: int,
         capture_group: int,
         exclude_names: set[str],
         min_entropy: float,
         findings: list[Finding],
+        seen: set[tuple[int, str]],
     ) -> None:
         try:
             value = match.group(capture_group)
@@ -102,10 +111,17 @@ class DockerRegexRule(RuleHandler):
         if name.upper() in exclude_names:
             return
 
+        if _is_runtime_reference(value):
+            return
+
         if shannon_entropy(value) < min_entropy:
             return
 
-        line = instruction.line + match.string[: match.start()].count("\n")
+        line += match.string[: match.start()].count("\n")
+        identity = (line, name.upper())
+        if identity in seen:
+            return
+        seen.add(identity)
         snippet = self._snippet(instruction, name, value)
 
         findings.append(
@@ -139,15 +155,53 @@ class DockerRegexRule(RuleHandler):
         return text[search_pos + 1 : name_end]
 
     def _snippet(self, instruction, name: str, value: str) -> str:
-        # Prefer the first non-whitespace raw line of the instruction for
-        # short single-line assignments; otherwise synthesize name=value.
-        first_line = next(
-            (ln.strip() for ln in instruction.raw.splitlines() if ln.strip()),
-            "",
+        return f"{instruction.instruction_upper} {name}=<redacted>"
+
+
+def _assignment_candidates(instruction) -> list[str]:
+    """Split ENV/ARG assignments so every value is independently scanned."""
+    try:
+        tokens = shlex.split(instruction.args, posix=True)
+    except ValueError:
+        tokens = instruction.args.split()
+    if not tokens:
+        return []
+
+    assignments: list[tuple[str, str]] = []
+    for token in tokens:
+        if "=" in token:
+            name, value = token.split("=", 1)
+            assignments.append((name, value))
+
+    if not assignments and instruction.instruction_upper == "ENV" and len(tokens) >= 2:
+        assignments.append((tokens[0], " ".join(tokens[1:])))
+
+    return [
+        f"{instruction.instruction_upper} {name}={value}"
+        for name, value in assignments
+    ]
+
+
+def _is_runtime_reference(value: str) -> bool:
+    stripped = _normalized_value(value)
+    return bool(
+        re.fullmatch(
+            r"\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})",
+            stripped,
         )
-        if first_line:
-            return first_line
-        return f"{instruction.instruction_upper} {name}={value}"
+        or re.fullmatch(r"\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}", stripped)
+    )
+
+
+def _normalized_value(value: str) -> str:
+    stripped = value.strip()
+    if (
+        len(stripped) >= 2
+        and stripped[0] == stripped[-1]
+        and stripped[0] in {'"', "'"}
+    ):
+        return stripped[1:-1]
+    return stripped
 
 
 __all__ = ["DockerRegexRule"]

@@ -7,9 +7,8 @@ from collections import Counter
 def shannon_entropy(s: str) -> float:
     """Shannon entropy (bits/char) of a string.
 
-    An empty string has entropy 0.0. The threshold of 3.5 is the locked
-    pipeline-audit default for distinguishing real secrets from short
-    or low-variability values.
+    An empty string has entropy 0.0. Individual rules may configure an
+    entropy threshold when it is appropriate for their signal.
     """
     if not s:
         return 0.0

@@ -37,7 +37,7 @@ class TestBundledRuleset:
         r = rules["DOCKER-R002"]
         assert r.severity == Severity.CRITICAL
         assert r.type == "regex"
-        assert r.match["regex"]["min_entropy"] == 3.5
+        assert r.match["regex"]["min_entropy"] == 0.0
 
     def test_gha_r001_fields(self):
         rules = {r.id: r for r in load_ruleset()}
@@ -138,6 +138,41 @@ class TestMalformedRuleset:
         with pytest.raises(RulesetValidationError, match="schema validation failed"):
             load_ruleset(p)
 
+    @pytest.mark.parametrize(
+        ("target", "regex_config", "message"),
+        [
+            ("github_workflow", "scope_keys: run", "scope_keys"),
+            ("github_workflow", "scope_keys: [run]\nexclude_keys: env", "exclude_keys"),
+            ("dockerfile", "exclude_names: API_KEY", "exclude_names"),
+            ("dockerfile", "min_entropy: .inf", "min_entropy"),
+            ("dockerfile", "min_entropy: -1", "min_entropy"),
+        ],
+    )
+    def test_invalid_regex_option_types_raise(
+        self, tmp_path, target, regex_config, message
+    ):
+        p = tmp_path / "bad_regex_options.yaml"
+        indented_config = regex_config.replace("\n", "\n                    ")
+        p.write_text(
+            textwrap.dedent(f"""\
+            version: "1.0"
+            rules:
+              - id: {"GHA-R099" if target == "github_workflow" else "DOCKER-R099"}
+                title: Test
+                severity: High
+                target: {target}
+                type: regex
+                match:
+                  regex:
+                    pattern: "(secret)"
+                    {indented_config}
+                remediation: fix it
+            """),
+            encoding="utf-8",
+        )
+        with pytest.raises(RulesetValidationError, match=message):
+            load_ruleset(p)
+
 
 # ─── merge behaviour ──────────────────────────────────────────────────────────
 
@@ -183,7 +218,10 @@ class TestMergedRuleset:
                 severity: Low
                 target: dockerfile
                 type: structural
-                match: {}
+                match:
+                  structural:
+                    kind: missing_instruction
+                    instruction: HEALTHCHECK
                 remediation: fix it
             """),
             encoding="utf-8",

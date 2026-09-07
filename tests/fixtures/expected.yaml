@@ -55,8 +55,11 @@ snapshots:
         file: Dockerfile
         severity: High
   10_docker_arg_user:
-    description: "Dockerfile with ARG then USER $UID"
-    expected: []
+    description: "Dockerfile with build-argument-controlled USER $UID"
+    expected:
+      - rule_id: DOCKER-R001
+        file: Dockerfile
+        severity: High
 
   # ─── GHA snapshots (11–20) ────────────────────────────────────────────────
   11_gha_tag_v4:
@@ -131,8 +134,11 @@ snapshots:
     description: "Dockerfile with only allowlisted ENV names (NODE_ENV, BUILD_NUMBER, LANG)"
     expected: []
   24_docker_env_low_entropy:
-    description: "Dockerfile with ENV API_KEY=abc (entropy below 3.5 floor)"
-    expected: []
+    description: "Dockerfile with a short but still hardcoded API_KEY"
+    expected:
+      - rule_id: DOCKER-R002
+        file: Dockerfile
+        severity: Critical
   25_docker_env_mixed:
     description: "Dockerfile with NODE_ENV (safe) + API_TOKEN (secret, high entropy) + OTHER_FLAG (no keyword)"
     expected:
@@ -146,8 +152,11 @@ snapshots:
         file: Dockerfile
         severity: Critical
   27_docker_arg_no_secret:
-    description: "Dockerfile with ARG VERSION/UID only, no secret-keyword names"
-    expected: []
+    description: "Dockerfile with no hardcoded secret but build-argument-controlled USER"
+    expected:
+      - rule_id: DOCKER-R001
+        file: Dockerfile
+        severity: High
   28_docker_env_keyword_substring:
     description: "Dockerfile with ENV SECRETAPI_KEY=high-entropy (name contains KEY substring)"
     expected:

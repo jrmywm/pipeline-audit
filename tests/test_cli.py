@@ -94,6 +94,55 @@ class TestNonexistentPath:
         assert result.exit_code != 0
 
 
+class TestOutputErrors:
+    def test_unwritable_output_is_reported_cleanly(self, tmp_path, monkeypatch):
+        runner = CliRunner()
+
+        def deny_write(self, *args, **kwargs):
+            raise PermissionError("denied")
+
+        monkeypatch.setattr(Path, "write_text", deny_write)
+        result = runner.invoke(
+            main,
+            ["scan", str(FIXTURES / "repo_good"), "--output", str(tmp_path / "report.md")],
+        )
+        assert result.exit_code != 0
+        assert "Cannot write report" in result.output
+        assert "Traceback" not in result.output
+
+
+class TestSecretRedaction:
+    def test_all_report_formats_redact_detected_secret(self, tmp_path):
+        secret = "super-secret-value-123"
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "Dockerfile").write_text(
+            f"FROM alpine\nENV API_KEY={secret}\nUSER 1001\n",
+            encoding="utf-8",
+        )
+        output = tmp_path / "audit.md"
+        result = CliRunner().invoke(
+            main,
+            [
+                "scan",
+                str(repo),
+                "--format",
+                "md",
+                "--format",
+                "json",
+                "--format",
+                "sarif",
+                "--output",
+                str(output),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        for suffix in (".md", ".json", ".sarif"):
+            report = output.with_suffix(suffix).read_text(encoding="utf-8")
+            assert secret not in report
+            assert "redacted" in report
+
+
 class TestFormatFlag:
     def test_md_format_default(self, tmp_path):
         runner = CliRunner()

@@ -48,12 +48,15 @@ def _scan(text: str, **kw) -> list:
 
 class TestSecretInEnvFires:
     def test_high_entropy_env_fires(self):
-        f = _scan("FROM alpine\nENV API_KEY=ak_live_8a9b3c7d2e1f4a6b5c8d9e2f1a\n")
+        secret = "ak_live_8a9b3c7d2e1f4a6b5c8d9e2f1a"
+        f = _scan(f"FROM alpine\nENV API_KEY={secret}\n")
         assert len(f) == 1
         assert f[0].rule_id == "DOCKER-R002"
         assert f[0].severity == Severity.CRITICAL
         assert f[0].line == 2
         assert "API_KEY" in (f[0].location.snippet or "")
+        assert secret not in (f[0].location.snippet or "")
+        assert "<redacted>" in (f[0].location.snippet or "")
 
     def test_arg_secret_fires(self):
         f = _scan("FROM alpine\nARG GITHUB_TOKEN=ghp_aBcDeFgHiJkLmNoPqRsTuVw012345\n")
@@ -66,6 +69,27 @@ class TestSecretInEnvFires:
 
     def test_lowercase_keyword_fires(self):
         f = _scan("FROM alpine\nENV password=hDx8Vn4KpR2Lm9SzTqFy6XcJ3MqNePZ\n")
+        assert len(f) == 1
+
+    def test_quoted_secret_produces_one_finding(self):
+        f = _scan(
+            'FROM alpine\nENV API_KEY="super-secret-value"\n',
+            min_entropy=0.0,
+        )
+        assert len(f) == 1
+
+    def test_quoted_secret_with_spaces_produces_one_finding(self):
+        f = _scan(
+            'FROM alpine\nENV API_KEY="super secret value"\n',
+            min_entropy=0.0,
+        )
+        assert len(f) == 1
+
+    def test_parameter_expansion_with_literal_fallback_fires(self):
+        f = _scan(
+            "FROM alpine\nENV API_KEY=${OTHER_KEY:-hardcoded-secret}\n",
+            min_entropy=0.0,
+        )
         assert len(f) == 1
 
 
@@ -84,6 +108,13 @@ class TestNoSecretFires:
 
     def test_substitution_placeholder_low_entropy(self):
         assert _scan("FROM alpine\nENV API_KEY={{EV_VAR}}\nUSER 1001\n") == []
+
+    @pytest.mark.parametrize("value", ["$API_KEY", "${API_KEY}", "{{API_KEY}}"])
+    def test_pure_runtime_reference_is_skipped(self, value):
+        assert _scan(
+            f"FROM alpine\nENV API_KEY={value}\nUSER 1001\n",
+            min_entropy=0.0,
+        ) == []
 
     def test_non_env_arg_instruction_skipped(self):
         assert _scan("FROM alpine\nRUN echo abc\nUSER 1001\n") == []
@@ -154,15 +185,12 @@ class TestMultipleSecretsPerInstruction:
         assert "API_TOKEN" in snippets
         assert "API_KEY" in snippets
 
-    def test_extra_pair_with_allowlisted_name_does_not_block_secret_pair(self):
-        # Two pairs on one ENV line; only the allowlist candidate is reached by
-        # the current regex (single non-whitespace run). Should fire because
-        # NODE_ENV is allowlisted, but the regex never even matches the
-        # second pair on its own — so we expect zero when the first pair's
-        # name is allowlisted.
+    def test_extra_pair_with_allowlisted_name_still_finds_secret_pair(self):
         text = (
             "FROM alpine\n"
             "ENV NODE_ENV=production API_TOKEN=hDx8Vn4KpR2Lm9SzTqFy6XcJ3MqNePZ\n"
             "USER 1001\n"
         )
-        assert _scan(text) == []
+        findings = _scan(text)
+        assert len(findings) == 1
+        assert "API_TOKEN=<redacted>" in (findings[0].location.snippet or "")

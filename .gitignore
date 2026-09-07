@@ -11,6 +11,8 @@ pip-wheel-metadata/
 
 # Virtual envs
 .venv/
+.uv-cache/
+.python/
 venv/
 env/
 

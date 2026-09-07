@@ -19,6 +19,13 @@ KNOWN_INSTRUCTIONS = {
     "STOPSIGNAL", "HEALTHCHECK", "SHELL",
 }
 
+MAX_WORKFLOW_NODES = 10_000
+MAX_WORKFLOW_DEPTH = 100
+
+
+class _WorkflowComplexityError(ValueError):
+    pass
+
 
 @dataclass(frozen=True)
 class DockerInstruction:
@@ -170,6 +177,13 @@ def parse_workflow(text: str) -> ParsedWorkflow:
             data={}, line_map={}, raw_lines=raw_lines,
             parse_errors=[f"YAML parse error: {exc}"],
         )
+    except RecursionError as exc:
+        return ParsedWorkflow(
+            data={},
+            line_map={},
+            raw_lines=raw_lines,
+            parse_errors=[f"workflow exceeds safe complexity limits: {exc}"],
+        )
 
     if doc is None:
         return ParsedWorkflow(
@@ -183,7 +197,15 @@ def parse_workflow(text: str) -> ParsedWorkflow:
             parse_errors=[f"workflow root must be a mapping, got {type(doc).__name__}"],
         )
 
-    plain = _convert_with_lines(doc, (), line_map)
+    try:
+        plain = _convert_with_lines(doc, (), line_map, [0])
+    except (_WorkflowComplexityError, RecursionError) as exc:
+        return ParsedWorkflow(
+            data={},
+            line_map={},
+            raw_lines=raw_lines,
+            parse_errors=[f"workflow exceeds safe complexity limits: {exc}"],
+        )
     if not isinstance(plain, dict):
         plain = {}
 
@@ -192,8 +214,24 @@ def parse_workflow(text: str) -> ParsedWorkflow:
     )
 
 
-def _convert_with_lines(node: Any, path: tuple, line_map: dict[tuple, tuple[int, int]]) -> Any:
+def _convert_with_lines(
+    node: Any,
+    path: tuple,
+    line_map: dict[tuple, tuple[int, int]],
+    node_count: list[int],
+    depth: int = 0,
+) -> Any:
     from ruamel.yaml.comments import CommentedMap, CommentedSeq
+
+    node_count[0] += 1
+    if node_count[0] > MAX_WORKFLOW_NODES:
+        raise _WorkflowComplexityError(
+            f"expanded node count exceeds {MAX_WORKFLOW_NODES}"
+        )
+    if depth > MAX_WORKFLOW_DEPTH:
+        raise _WorkflowComplexityError(
+            f"nesting depth exceeds {MAX_WORKFLOW_DEPTH}"
+        )
 
     if isinstance(node, CommentedMap):
         result: dict[str, Any] = {}
@@ -202,7 +240,9 @@ def _convert_with_lines(node: Any, path: tuple, line_map: dict[tuple, tuple[int,
             lc = _safe_lc(node, key)
             if lc is not None:
                 line_map[key_path] = (lc[0] + 1, lc[1] + 1)
-            result[key] = _convert_with_lines(value, key_path, line_map)
+            result[key] = _convert_with_lines(
+                value, key_path, line_map, node_count, depth + 1
+            )
         return result
 
     if isinstance(node, CommentedSeq):
@@ -212,7 +252,9 @@ def _convert_with_lines(node: Any, path: tuple, line_map: dict[tuple, tuple[int,
             lc = _safe_lc_seq(node, idx)
             if lc is not None:
                 line_map[idx_path] = (lc[0] + 1, lc[1] + 1)
-            seq.append(_convert_with_lines(value, idx_path, line_map))
+            seq.append(
+                _convert_with_lines(value, idx_path, line_map, node_count, depth + 1)
+            )
         return seq
 
     if isinstance(node, str | int | float | bool) or node is None:

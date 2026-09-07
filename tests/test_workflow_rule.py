@@ -116,12 +116,19 @@ class TestUsesUnpinned:
         assert findings == []
 
     def test_uses_without_at(self):
-        # No @ at all - exempt (unusual but not our concern)
         findings = _scan(
             "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
             "      - uses: some-action\n"
         )
-        assert findings == []
+        assert len(findings) == 1
+
+    def test_unpinned_reusable_workflow_fires(self):
+        findings = _scan(
+            "on: push\njobs:\n  deploy:\n"
+            "    uses: owner/repo/.github/workflows/deploy.yml@main\n"
+        )
+        assert len(findings) == 1
+        assert "deploy.yml@main" in (findings[0].location.snippet or "")
 
     def test_custom_sha_pattern(self):
         custom = RuleSpec(

@@ -9,11 +9,6 @@ from pipeline_audit.core.parser import ParsedWorkflow
 from pipeline_audit.core.rule_base import Finding, RuleHandler
 from pipeline_audit.core.rule_loader import Rule as RuleSpec
 
-# Sibling-key indents / value patterns that mark the end of a block scalar's
-# multi-line body. We use a simpler heuristic below instead.
-_BLOCK_SCALAR_HINT = re.compile(r":\s*[|>][\+\-]?\s*$")
-
-
 class WorkflowRegexRule(RuleHandler):
     """Handles `type: regex` rules targeting GitHub Actions workflows.
 
@@ -70,53 +65,98 @@ class WorkflowRegexRule(RuleHandler):
             for idx, step in enumerate(steps):
                 if not isinstance(step, dict):
                     continue
-                for key, value in step.items():
-                    if key not in scope_keys:
-                        continue
-                    self._scan_step_value(
-                        spec,
-                        file=file,
-                        wf=workflow,
-                        job=job_name,
-                        idx=idx,
-                        key=key,
-                        value=value,
-                        pattern=pattern,
-                        findings=findings,
-                    )
+                self._scan_mapping(
+                    spec,
+                    file=file,
+                    wf=workflow,
+                    node=step,
+                    path=("jobs", job_name, "steps", idx),
+                    scope_keys=scope_keys,
+                    exclude_keys=exclude_keys,
+                    pattern=pattern,
+                    findings=findings,
+                )
         return findings
 
-    def _scan_step_value(
+    def _scan_mapping(
         self,
         spec: RuleSpec,
         *,
         file: Path,
         wf: ParsedWorkflow,
-        job: str,
-        idx: int,
-        key: str,
+        node: Any,
+        path: tuple,
+        scope_keys: set[str],
+        exclude_keys: set[str],
+        pattern: re.Pattern,
+        findings: list[Finding],
+    ) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                child_path = path + (key,)
+                if key in exclude_keys:
+                    continue
+                if key in scope_keys:
+                    self._scan_value(
+                        spec,
+                        file=file,
+                        wf=wf,
+                        path=child_path,
+                        value=value,
+                        pattern=pattern,
+                        findings=findings,
+                    )
+                else:
+                    self._scan_mapping(
+                        spec,
+                        file=file,
+                        wf=wf,
+                        node=value,
+                        path=child_path,
+                        scope_keys=scope_keys,
+                        exclude_keys=exclude_keys,
+                        pattern=pattern,
+                        findings=findings,
+                    )
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                self._scan_mapping(
+                    spec,
+                    file=file,
+                    wf=wf,
+                    node=value,
+                    path=path + (index,),
+                    scope_keys=scope_keys,
+                    exclude_keys=exclude_keys,
+                    pattern=pattern,
+                    findings=findings,
+                )
+
+    def _scan_value(
+        self,
+        spec: RuleSpec,
+        *,
+        file: Path,
+        wf: ParsedWorkflow,
+        path: tuple,
         value: Any,
         pattern: re.Pattern,
         findings: list[Finding],
     ) -> None:
         if not isinstance(value, str):
-            for sub in value if isinstance(value, list) else []:
-                self._scan_step_value(
+            for sub_index, sub in enumerate(value if isinstance(value, list) else []):
+                self._scan_value(
                     spec,
                     file=file,
                     wf=wf,
-                    job=job,
-                    idx=idx,
-                    key=key,
+                    path=path + (sub_index,),
                     value=sub,
                     pattern=pattern,
                     findings=findings,
                 )
             return
 
-        base_line = wf.line_of("jobs", job, "steps", idx, key)
-        if base_line is None:
-            base_line = self._fallback_line(wf, job, idx, key)
+        base_line = wf.line_of(*path)
 
         # Block scalars (`|` / `>`) start the value on the line *after*
         # the key line.
@@ -148,18 +188,5 @@ class WorkflowRegexRule(RuleHandler):
             # We cheaply check for a trailing `:` followed by the indicator.
             return bool(re.search(r":\s*[|>][\+\-]?\s*$", line))
         return False
-
-    def _fallback_line(
-        self, wf: ParsedWorkflow, job: str, idx: int, key: str
-    ) -> int | None:
-        for path in (
-            ("jobs", job, "steps", idx, key),
-            ("jobs", job, "steps", idx),
-        ):
-            line = wf.line_of(*path)
-            if line is not None:
-                return line
-        return None
-
 
 __all__ = ["WorkflowRegexRule"]

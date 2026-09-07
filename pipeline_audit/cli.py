@@ -11,6 +11,7 @@ from pipeline_audit.core.json_emitter import render_json
 from pipeline_audit.core.reporter import render_markdown
 from pipeline_audit.core.sarif_emitter import render_sarif
 from pipeline_audit.core.severity import Severity
+from pipeline_audit.core.exceptions import PipelineAuditError
 
 console = Console()
 err_console = Console(stderr=True)
@@ -46,7 +47,10 @@ def scan(path: Path, output: str, fmts: tuple[str, ...], ruleset: Path | None, f
     root = Path(path).resolve()
 
     console.print(f"[bold]pipeline-audit[/bold] scanning [cyan]{root}[/cyan] ...")
-    findings = scan_path(root, ruleset_path=ruleset)
+    try:
+        findings = scan_path(root, ruleset_path=ruleset)
+    except (PipelineAuditError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
     console.print(f"  found [bold]{len(findings)}[/bold] finding(s)")
 
     # Print a quick console summary table
@@ -77,8 +81,13 @@ def scan(path: Path, output: str, fmts: tuple[str, ...], ruleset: Path | None, f
             out_path = out_stem.with_suffix(".sarif")
         else:
             continue
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(content, encoding="utf-8")
+        try:
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(content, encoding="utf-8")
+        except OSError as exc:
+            raise click.ClickException(
+                f"Cannot write report {out_path}: {exc}"
+            ) from exc
         wrote_outputs.append(str(out_path))
 
     for o in wrote_outputs:

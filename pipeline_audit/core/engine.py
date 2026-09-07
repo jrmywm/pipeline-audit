@@ -16,6 +16,7 @@ from pipeline_audit.core.docker_rule import DockerStructuralRule
 from pipeline_audit.core.docker_regex_rule import DockerRegexRule
 from pipeline_audit.core.workflow_rule import WorkflowStructuralRule
 from pipeline_audit.core.workflow_regex_rule import WorkflowRegexRule
+from pipeline_audit.core.exceptions import RulesetValidationError, ScanInputError
 
 
 # Registry: maps (target, type) -> RuleHandler instance
@@ -45,21 +46,35 @@ def scan_path(
 ) -> list[Finding]:
     root = Path(root).resolve()
     rules = [r for r in load_merged_ruleset(ruleset_path) if r.enabled]
+    unsupported = [r.id for r in rules if get_handler(r) is None]
+    if unsupported:
+        raise RulesetValidationError(
+            "No rule handler is available for enabled rule(s): " + ", ".join(unsupported)
+        )
     targets = find_audit_targets(root)
 
     findings: list[Finding] = []
     for file_path, kind in targets:
         try:
-            raw_text = file_path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
+            raw_text = file_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise ScanInputError(f"Cannot read scan target {file_path}: {exc}") from exc
 
         dockerfile: ParsedDockerfile | None = None
         workflow: ParsedWorkflow | None = None
         if kind == FileKind.DOCKERFILE:
             dockerfile = parse_dockerfile(raw_text)
+            parse_errors = dockerfile.parse_errors
         elif kind == FileKind.GITHUB_WORKFLOW:
             workflow = parse_workflow(raw_text)
+            parse_errors = workflow.parse_errors
+        else:
+            parse_errors = []
+
+        if parse_errors:
+            raise ScanInputError(
+                f"Cannot safely analyze {file_path}: " + "; ".join(parse_errors)
+            )
 
         for spec in rules:
             if spec.target != kind.value:

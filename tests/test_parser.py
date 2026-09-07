@@ -150,6 +150,19 @@ class TestWorkflowParser:
         assert result.parse_errors != []
         assert "mapping" in result.parse_errors[0]
 
+    def test_alias_expansion_exceeding_budget_fails_closed(self):
+        text = "a: &a [x, x, x, x, x]\n"
+        previous = "a"
+        for name in "bcdefg":
+            aliases = ", ".join([f"*{previous}"] * 5)
+            text += f"{name}: &{name} [{aliases}]\n"
+            previous = name
+        text += "jobs: {}\n"
+
+        result = parse_workflow(text)
+        assert result.data == {}
+        assert any("complexity limits" in error for error in result.parse_errors)
+
     def test_line_map_round_trip(self, bad_wf):
         # Every top-level key should have a line entry
         for key in bad_wf.data:

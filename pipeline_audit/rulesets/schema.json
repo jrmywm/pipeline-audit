@@ -50,8 +50,8 @@
           "description": "Which file type this rule applies to"
         },
         "type": {
-          "enum": ["structural", "regex", "composite"],
-          "description": "Match strategy: structural (semantic), regex (pattern), or composite (both)"
+          "enum": ["structural", "regex"],
+          "description": "Supported match strategy: structural (semantic) or regex (pattern)"
         },
         "match": {
           "type": "object",

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,6 +29,7 @@ from typing import Any
 from ruamel.yaml import YAML
 
 from pipeline_audit.core.engine import scan_path
+from pipeline_audit.core.rule_loader import load_ruleset
 
 
 SNAPSHOT_ROOT = Path(__file__).parent.parent / "tests" / "fixtures" / "snapshots"
@@ -99,48 +99,61 @@ def run_validation(
 ) -> dict[str, list[MatchResult]]:
     expected_data = _load_expected(expected_path)
 
-    # Per-rule aggregation
-    per_rule: dict[str, list[MatchResult]] = defaultdict(list)
-    mismatches: list[tuple[str, str]] = []
+    bundled_rule_ids = {rule.id for rule in load_ruleset() if rule.enabled}
+    expected_rule_ids = {
+        entry["rule_id"]
+        for snapshot in expected_data.values()
+        for entry in snapshot.get("expected", [])
+    }
+    missing_coverage = bundled_rule_ids - expected_rule_ids
+    if missing_coverage:
+        missing = ", ".join(sorted(missing_coverage))
+        raise ValueError(f"Bundled rule(s) have no positive fixture coverage: {missing}")
 
+    # Per-rule aggregation
+    per_rule: dict[str, list[MatchResult]] = {
+        rule_id: [] for rule_id in sorted(bundled_rule_ids)
+    }
     for snapshot_name in sorted(expected_data.keys()):
         snapshot_dir = snapshots_dir / snapshot_name
         if not snapshot_dir.is_dir():
-            print(f"  [MISS] snapshot dir not found: {snapshot_name}")
-            continue
+            raise FileNotFoundError(f"Snapshot directory not found: {snapshot_name}")
 
         snapshot_spec = expected_data[snapshot_name]
         expected_tuples = _expected_tuples(snapshot_spec)
         actual_findings = scan_path(snapshot_dir)
         actual_tuples = _normalize_findings(actual_findings, snapshot_dir)
-        match = _count_matches(expected_tuples, actual_tuples, snapshot_name)
-
-        for rule_id in set(
-            [t[0] for t in expected_tuples] + [t[0] for t in actual_tuples]
-        ):
+        rule_ids = bundled_rule_ids | {
+            t[0] for t in expected_tuples
+        } | {t[0] for t in actual_tuples}
+        matches: list[MatchResult] = []
+        for rule_id in rule_ids:
+            match = _count_matches(
+                [item for item in expected_tuples if item[0] == rule_id],
+                [item for item in actual_tuples if item[0] == rule_id],
+                snapshot_name,
+            )
             per_rule[rule_id].append(match)
+            matches.append(match)
 
         status = "OK"
-        if match.fp or match.fn:
+        if any(match.fp or match.fn for match in matches):
             status = "MISMATCH"
-            mismatches.append((snapshot_name, status))
-        if verbose or match.fp or match.fn:
+        if verbose or status == "MISMATCH":
+            tp = sum(match.tp for match in matches)
+            fp = sum(match.fp for match in matches)
+            fn = sum(match.fn for match in matches)
             print(
                 f"  [{status:8s}] {snapshot_name}: "
-                f"TP={match.tp} FP={match.fp} FN={match.fn}"
+                f"TP={tp} FP={fp} FN={fn}"
             )
-            if match.fp:
+            for match in matches:
                 for d in match.fp_details:
                     print(f"            FP: {d}")
-            if match.fn:
                 for d in match.fn_details:
                     print(f"            FN: {d}")
 
     return per_rule
-
-
-def _compute_metric(values: list[int]) -> int:
-    return sum(values)
 
 
 def report(per_rule: dict[str, list[MatchResult]]) -> bool:
@@ -193,7 +206,11 @@ def main() -> int:
     print(f"Validating against {args.snapshots}")
     print(f"Ground truth: {args.expected}")
     print()
-    per_rule = run_validation(args.expected, args.snapshots, verbose=args.verbose)
+    try:
+        per_rule = run_validation(args.expected, args.snapshots, verbose=args.verbose)
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"Validation error: {exc}", file=sys.stderr)
+        return 2
     ok = report(per_rule)
     return 0 if ok else 1
 

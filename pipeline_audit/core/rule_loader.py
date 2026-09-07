@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -63,6 +65,108 @@ def _validate(data: dict[str, Any]) -> None:
         if len(errors) > 5:
             msgs.append(f"  ... and {len(errors) - 5} more error(s)")
         raise RulesetValidationError(f"Ruleset schema validation failed ({len(errors)} error(s)):\n" + "\n".join(msgs))
+    _validate_semantics(data)
+
+
+def _validate_semantics(data: dict[str, Any]) -> None:
+    seen: set[str] = set()
+    for rule in data.get("rules", []):
+        rule_id = rule["id"]
+        if rule_id in seen:
+            raise RulesetValidationError(f"Duplicate rule id: {rule_id}")
+        seen.add(rule_id)
+
+        rule_type = rule["type"]
+        target = rule["target"]
+        match = rule["match"]
+        if rule_type == "structural":
+            structural = match.get("structural")
+            if not isinstance(structural, dict):
+                raise RulesetValidationError(f"{rule_id}: match.structural must be a mapping")
+            kind = structural.get("kind")
+            supported = {
+                "dockerfile": {"missing_instruction"},
+                "github_workflow": {"uses_unpinned"},
+            }
+            if kind not in supported[target]:
+                raise RulesetValidationError(
+                    f"{rule_id}: unsupported structural kind {kind!r} for {target}"
+                )
+            if kind == "missing_instruction" and not structural.get("instruction"):
+                raise RulesetValidationError(
+                    f"{rule_id}: missing_instruction requires an instruction"
+                )
+            sha_pattern = structural.get("sha_pattern")
+            if sha_pattern is not None:
+                _compile_pattern(rule_id, sha_pattern)
+        elif rule_type == "regex":
+            regex = match.get("regex")
+            if not isinstance(regex, dict):
+                raise RulesetValidationError(f"{rule_id}: match.regex must be a mapping")
+            pattern = _compile_pattern(rule_id, regex.get("pattern"))
+            if target == "dockerfile":
+                capture_group = regex.get("capture_group", 1)
+                if (
+                    isinstance(capture_group, bool)
+                    or not isinstance(capture_group, int)
+                    or capture_group < 1
+                ):
+                    raise RulesetValidationError(
+                        f"{rule_id}: capture_group must be a positive integer"
+                    )
+                if capture_group > pattern.groups:
+                    raise RulesetValidationError(
+                        f"{rule_id}: capture_group {capture_group} exceeds the pattern's {pattern.groups} group(s)"
+                    )
+                _validate_string_list(rule_id, regex, "exclude_names")
+                min_entropy = regex.get("min_entropy", 0.0)
+                if (
+                    isinstance(min_entropy, bool)
+                    or not isinstance(min_entropy, (int, float))
+                    or min_entropy < 0
+                    or (
+                        isinstance(min_entropy, float)
+                        and not math.isfinite(min_entropy)
+                    )
+                ):
+                    raise RulesetValidationError(
+                        f"{rule_id}: min_entropy must be a finite non-negative number"
+                    )
+            else:
+                _validate_string_list(rule_id, regex, "scope_keys", required=True)
+                _validate_string_list(rule_id, regex, "exclude_keys")
+
+
+def _validate_string_list(
+    rule_id: str,
+    config: dict[str, Any],
+    field_name: str,
+    *,
+    required: bool = False,
+) -> None:
+    value = config.get(field_name)
+    if value is None:
+        if required:
+            raise RulesetValidationError(f"{rule_id}: {field_name} is required")
+        return
+    if (
+        not isinstance(value, list)
+        or (required and not value)
+        or any(not isinstance(item, str) or not item.strip() for item in value)
+    ):
+        qualifier = "a non-empty list" if required else "a list"
+        raise RulesetValidationError(
+            f"{rule_id}: {field_name} must be {qualifier} of non-empty strings"
+        )
+
+
+def _compile_pattern(rule_id: str, pattern: Any) -> re.Pattern:
+    if not isinstance(pattern, str) or not pattern:
+        raise RulesetValidationError(f"{rule_id}: regex pattern must be a non-empty string")
+    try:
+        return re.compile(pattern)
+    except re.error as exc:
+        raise RulesetValidationError(f"{rule_id}: invalid regex pattern: {exc}") from exc
 
 
 def _rule_from_dict(r: dict[str, Any]) -> Rule:

@@ -2,29 +2,29 @@
 
 Headless DevSecOps **pipeline audit** — a lightweight SAST scanner for CI/CD
 configurations. Detects common misconfigurations in GitHub Actions workflows
-(`.github/workflows/*.yml`) and Dockerfiles, with an externalized YAML ruleset
-so new signatures ship without code changes.
+(`.github/workflows/*.yml`) and Dockerfiles, with externalized YAML configuration
+for supported structural checks and regex signatures.
 
 ## Features
 
-- **Externalized YAML ruleset** — add or tune rules without touching Python
+- **Externalized YAML ruleset** — add regex signatures or tune supported rules
 - **4 built-in rules** covering root containers, hardcoded secrets, unpinned
   actions, and secret interpolation in run blocks
 - **Three output formats** — Markdown (human review), JSON (CI ingestion),
   SARIF 2.1.0 (GitHub Code Scanning)
-- **`.gitignore`-aware traversal** — won't scan vendored or ignored paths
-- **Shannon entropy + allowlist** for secret detection to keep false positives
-  down
+- **Nested `.gitignore`-aware traversal** — skips ignored paths throughout the tree, while still scanning tracked security configurations
+- **Runtime-reference suppression + allowlist** for secret detection, with an
+  optional Shannon entropy threshold
 - **Exit-code policy** (`--fail-on`) for CI gating
 
 ## Rules
 
 | Rule ID | Severity | Target | What it detects |
 |---------|----------|--------|-----------------|
-| `DOCKER-R001` | High | Dockerfile | No `USER` instruction (container runs as root) |
-| `DOCKER-R002` | Critical | Dockerfile | Hardcoded secret in `ENV`/`ARG` (regex + entropy + allowlist) |
+| `DOCKER-R001` | High | Dockerfile | Final stage lacks a statically non-root `USER` |
+| `DOCKER-R002` | Critical | Dockerfile | Hardcoded secret in `ENV`/`ARG` (regex + allowlist + optional entropy threshold) |
 | `GHA-R001` | Medium | Workflow | Unpinned action (tag/branch ref instead of 40-hex SHA) |
-| `GHA-R002` | High | Workflow | `${{ secrets.* }}` interpolated into `run`/`script` body |
+| `GHA-R002` | High | Workflow | `${{ secrets.* }}` interpolated into `run` or nested `script` bodies |
 
 ## Quickstart
 
@@ -79,9 +79,9 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install pipeline-audit
-      - run: pipeline-audit scan .github/workflows/ --format sarif --fail-on Medium
+      - run: pipeline-audit scan . --format sarif --fail-on Medium
       - uses: github/codeql-action/upload-sarif@<pin-to-sha>
-        if: always()
+        if: ${{ always() && hashFiles('audit_report.sarif') != '' && (github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]')) }}
         with:
           sarif_file: audit_report.sarif
 ```
@@ -97,7 +97,7 @@ all 4 rules.
 
 ## Status
 
-v1.0.0. See [PLAN.md](./PLAN.md) for full architecture and roadmap.
+v1.0.0.
 
 ## License
 

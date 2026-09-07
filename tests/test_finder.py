@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import subprocess
 
 import pytest
 
 from pipeline_audit.core.finder import FileKind, find_audit_targets
+from pipeline_audit.core.exceptions import ScanInputError
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -72,6 +75,85 @@ class TestGitignore:
         targets = find_audit_targets(tmp_path)
         paths = [p for p, _ in targets]
         assert not any(p.name == "ci.yml" for p in paths), "ci.yml should be gitignored"
+
+    def test_nested_gitignore_is_respected(self, tmp_path):
+        nested = tmp_path / "service"
+        generated = nested / "generated"
+        generated.mkdir(parents=True)
+        (nested / ".gitignore").write_text("generated/\n", encoding="utf-8")
+        (generated / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+        assert find_audit_targets(tmp_path) == []
+
+    def test_tracked_security_target_overrides_gitignore(self, tmp_path):
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        (tmp_path / ".gitignore").write_text("ci.yml\n", encoding="utf-8")
+        workflow_dir = tmp_path / ".github" / "workflows"
+        workflow_dir.mkdir(parents=True)
+        workflow = workflow_dir / "ci.yml"
+        workflow.write_text("on: push\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "add", "-f", ".github/workflows/ci.yml"],
+            check=True,
+        )
+
+        assert (workflow, FileKind.GITHUB_WORKFLOW) in find_audit_targets(tmp_path)
+
+    def test_invalid_utf8_gitignore_fails_closed(self, tmp_path):
+        (tmp_path / ".gitignore").write_bytes(b"Dockerfile\xff\n")
+        with pytest.raises(ScanInputError, match="Cannot read ignore file"):
+            find_audit_targets(tmp_path)
+
+
+class TestWorkflowRoots:
+    def test_workflow_directory_can_be_scan_root(self, tmp_path):
+        workflow_dir = tmp_path / ".github" / "workflows"
+        workflow_dir.mkdir(parents=True)
+        workflow = workflow_dir / "ci.yml"
+        workflow.write_text("on: push\n", encoding="utf-8")
+        assert find_audit_targets(workflow_dir) == [
+            (workflow, FileKind.GITHUB_WORKFLOW)
+        ]
+
+
+class TestSizeLimit:
+    def test_oversized_target_fails_closed(self, tmp_path):
+        dockerfile = tmp_path / "Dockerfile"
+        dockerfile.write_bytes(b"x" * 1_048_577)
+        with pytest.raises(ScanInputError, match="exceeds"):
+            find_audit_targets(tmp_path)
+
+
+class TestTraversalSafety:
+    def test_walk_error_fails_closed(self, tmp_path, monkeypatch):
+        def failing_walk(*args, onerror=None, **kwargs):
+            assert onerror is not None
+            onerror(PermissionError("denied"))
+            yield  # pragma: no cover
+
+        monkeypatch.setattr("pipeline_audit.core.finder.os.walk", failing_walk)
+        with pytest.raises(ScanInputError, match="Cannot traverse scan tree"):
+            find_audit_targets(tmp_path)
+
+    @pytest.mark.parametrize("is_directory", [False, True])
+    def test_symlink_fails_closed(self, tmp_path, is_directory):
+        root = tmp_path / "repo"
+        root.mkdir()
+        if is_directory:
+            target = tmp_path / "external"
+            target.mkdir()
+            (target / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+            link = root / "service"
+        else:
+            target = tmp_path / "external.Dockerfile"
+            target.write_text("FROM scratch\n", encoding="utf-8")
+            link = root / "Dockerfile"
+        try:
+            os.symlink(target, link, target_is_directory=is_directory)
+        except OSError as exc:
+            pytest.skip(f"symlink creation unavailable: {exc}")
+
+        with pytest.raises(ScanInputError, match="Symlinks are not supported"):
+            find_audit_targets(root)
 
 
 # ─── excluded directory names ───────────────────────────────────────────────

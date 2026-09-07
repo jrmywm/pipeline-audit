@@ -90,6 +90,16 @@ class TestSecretsInterpFires:
         )
         assert len(f) == 1
 
+    def test_nested_with_script_fires(self):
+        f = _scan(
+            "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            "      - uses: actions/github-script@v7\n"
+            "        with:\n"
+            "          script: console.log(${{ secrets.SCRIPT_TOKEN }})\n"
+        )
+        assert len(f) == 1
+        assert f[0].location.line == 8
+
 
 # ─── true negatives ───────────────────────────────────────────────────────────
 

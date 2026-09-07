@@ -1,6 +1,6 @@
 # Pipeline Audit Report
 
-_Generated: 2026-07-15 17:26:08 UTC_
+_Generated: 2026-09-07 06:10:43 UTC_
 
 ## Summary
 
@@ -31,8 +31,8 @@ _2 finding(s): :red_circle: Critical: 1, :orange_circle: High: 1_
 
 | Severity | Rule | Line | Snippet |
 |----------|------|------|---------|
-| :red_circle: Critical | `DOCKER-R002` | 5 | `ENV API_KEY=sk-1234567890abcdef1234567890abcdef` |
-| :orange_circle: High | `DOCKER-R001` | 1 | `# syntax=docker/dockerfile:1.6` |
+| :red_circle: Critical | `DOCKER-R002` | 5 | `ENV API_KEY=<redacted>` |
+| :orange_circle: High | `DOCKER-R001` | 2 | `# syntax=docker/dockerfile:1.6` |
 
 ### `vendor/Dockerfile`
 
@@ -44,7 +44,7 @@ _1 finding(s): :orange_circle: High: 1_
 
 ## Details
 
-### :orange_circle: GHA-R002 &mdash; GitHub secret interpolated into inline bash script
+### :orange_circle: GHA-R002 &mdash; GitHub secret interpolated into executable script
 
 - **File:** `.github/workflows/bad.yml:12`
 - **Severity:** High
@@ -53,7 +53,7 @@ _1 finding(s): :orange_circle: High: 1_
 - **Remediation:** Pass secrets to the step via the `env:` mapping and reference them as `$VAR_NAME` inside the bash script. Never interpolate `${{ secrets.* }}` directly into a run block.
 - **References:** <https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-secrets-securely>
 
-### :orange_circle: GHA-R002 &mdash; GitHub secret interpolated into inline bash script
+### :orange_circle: GHA-R002 &mdash; GitHub secret interpolated into executable script
 
 - **File:** `.github/workflows/bad.yml:13`
 - **Severity:** High
@@ -85,20 +85,20 @@ _1 finding(s): :orange_circle: High: 1_
 - **File:** `Dockerfile:5`
 - **Severity:** Critical
 - **Rule ID:** DOCKER-R002
-- **Snippet:** `ENV API_KEY=sk-1234567890abcdef1234567890abcdef`
+- **Snippet:** `ENV API_KEY=<redacted>`
 - **Remediation:** Move secrets out of the image layer. Inject at runtime via Vault, GitHub secrets, docker secrets, or SOPS-encrypted files.
 - **References:** <https://docs.github.com/en/actions/security-guides/encrypted-secrets>
 
-### :orange_circle: DOCKER-R001 &mdash; Container runs as root (no USER directive)
+### :orange_circle: DOCKER-R001 &mdash; Final container stage may run as root
 
-- **File:** `Dockerfile:1`
+- **File:** `Dockerfile:2`
 - **Severity:** High
 - **Rule ID:** DOCKER-R001
 - **Snippet:** `# syntax=docker/dockerfile:1.6`
 - **Remediation:** Add a USER instruction near the end of the Dockerfile to specify a non-root user, e.g. `USER 1001` or `USER appuser`.
 - **References:** <https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user>
 
-### :orange_circle: DOCKER-R001 &mdash; Container runs as root (no USER directive)
+### :orange_circle: DOCKER-R001 &mdash; Final container stage may run as root
 
 - **File:** `vendor/Dockerfile:1`
 - **Severity:** High

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,7 +60,8 @@ def _result(f: Finding, root: Path | None) -> dict:
         if f.location.col is not None:
             region["startColumn"] = f.location.col
 
-    artifact_location = {"uri": _relative(f.file, root)}
+    relative_path = _relative(f.file, root)
+    artifact_location = {"uri": relative_path}
     physical_location = {"artifactLocation": artifact_location}
     if region:
         physical_location["region"] = region
@@ -73,7 +75,9 @@ def _result(f: Finding, root: Path | None) -> dict:
         },
         "locations": [{"physicalLocation": physical_location}],
         "partialFingerprints": {
-            "primaryLocationLineHash": f"{f.rule_id}:{f.file.as_posix()}:{f.location.line or 0}",
+            "primaryLocationLineHash": hashlib.sha256(
+                f"{f.rule_id}\0{relative_path}\0{f.location.snippet or ''}".encode("utf-8")
+            ).hexdigest(),
         },
     }
 

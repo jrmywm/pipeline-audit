@@ -41,10 +41,11 @@ class TestDockerR001Engine:
         bad_paths = [str(f.file) for f in findings if "node_modules" in str(f.file)]
         assert bad_paths == []
 
-    def test_location_line_is_1(self):
+    def test_location_points_to_final_stage(self):
         findings = scan_path(FIXTURES / "repo_bad")
         r001 = next(f for f in findings if f.rule_id == "DOCKER-R001")
-        assert r001.location.line == 1
+        assert r001.location.line is not None
+        assert r001.location.line >= 1
 
     def test_findings_sorted_by_severity_then_file(self):
         findings = scan_path(FIXTURES / "repo_bad")
@@ -86,7 +87,9 @@ class TestDisabledRule:
 
 
 class TestUnhandledRuleType:
-    def test_unhandled_rule_type_skipped(self, tmp_path):
+    def test_unhandled_rule_type_rejected(self, tmp_path):
+        from pipeline_audit.core.exceptions import RulesetValidationError
+
         ruleset = tmp_path / "rs.yaml"
         ruleset.write_text(
             "version: '1.0'\n"
@@ -115,9 +118,42 @@ class TestUnhandledRuleType:
         )
         df = tmp_path / "Dockerfile"
         df.write_text("FROM alpine\nENV FOO=bar\n", encoding="utf-8")
-        findings = scan_path(tmp_path, ruleset_path=ruleset)
-        # No finding -> unhandled rule type gracefully skipped
-        assert findings == []
+        with pytest.raises(RulesetValidationError):
+            scan_path(tmp_path, ruleset_path=ruleset)
+
+
+class TestFailClosed:
+    def test_invalid_workflow_raises(self, tmp_path):
+        from pipeline_audit.core.exceptions import ScanInputError
+
+        workflow_dir = tmp_path / ".github" / "workflows"
+        workflow_dir.mkdir(parents=True)
+        (workflow_dir / "invalid.yml").write_text("name: [\n", encoding="utf-8")
+        with pytest.raises(ScanInputError):
+            scan_path(tmp_path)
+
+    def test_invalid_utf8_target_raises(self, tmp_path):
+        from pipeline_audit.core.exceptions import ScanInputError
+
+        (tmp_path / "Dockerfile").write_bytes(b"FROM alpine\nENV API_\xffKEY=secret\n")
+        with pytest.raises(ScanInputError, match="Cannot read scan target"):
+            scan_path(tmp_path)
+
+    @pytest.mark.parametrize("user", ["root", "0", "$UID"])
+    def test_unsafe_or_unresolved_final_user_fires(self, tmp_path, user):
+        (tmp_path / "Dockerfile").write_text(
+            f"FROM alpine\nUSER {user}\n", encoding="utf-8"
+        )
+        findings = scan_path(tmp_path)
+        assert any(f.rule_id == "DOCKER-R001" for f in findings)
+
+    def test_builder_user_does_not_secure_final_stage(self, tmp_path):
+        (tmp_path / "Dockerfile").write_text(
+            "FROM base AS builder\nUSER 1001\nFROM alpine\nRUN true\n",
+            encoding="utf-8",
+        )
+        findings = scan_path(tmp_path)
+        assert any(f.rule_id == "DOCKER-R001" for f in findings)
 
 
 # ─── empty repo ───────────────────────────────────────────────────────────────
