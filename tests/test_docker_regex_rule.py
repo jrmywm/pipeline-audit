@@ -194,3 +194,24 @@ class TestMultipleSecretsPerInstruction:
         findings = _scan(text)
         assert len(findings) == 1
         assert "API_TOKEN=<redacted>" in (findings[0].location.snippet or "")
+
+
+class TestContinuedAssignmentLocations:
+    def test_each_continued_env_assignment_reports_its_own_line(self):
+        text = (
+            "FROM alpine\n"
+            "ENV APP_MODE=production \\\n"
+            "    API_KEY=ak_live_8a9b3c7d2e1f4a6b5c8d9e2f1a \\\n"
+            "    API_TOKEN=hDx8Vn4KpR2Lm9SzTqFy6XcJ3MqNePZ\n"
+        )
+        findings = _scan(text)
+        assert [finding.line for finding in findings] == [3, 4]
+
+    def test_continued_arg_assignment_reports_assignment_line(self):
+        findings = _scan(
+            "FROM alpine\n"
+            "ARG \\\n"
+            "    API_TOKEN=hDx8Vn4KpR2Lm9SzTqFy6XcJ3MqNePZ\n"
+        )
+        assert len(findings) == 1
+        assert findings[0].line == 3

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from pipeline_audit.core.parser import parse_workflow
-from pipeline_audit.core.rule_loader import Rule as RuleSpec
+from pipeline_audit.core.rule_loader import Rule as RuleSpec, load_ruleset
 from pipeline_audit.core.severity import Severity
 from pipeline_audit.core.workflow_regex_rule import WorkflowRegexRule
 
@@ -13,7 +13,10 @@ HANDLER = WorkflowRegexRule()
 
 
 def _spec(
-    pattern: str = r"\$\{\{\s*secrets\.[A-Za-z0-9_]+\s*\}\}",
+    pattern: str = (
+        r"\$\{\{\s*secrets(?:\.[A-Za-z0-9_]+|"
+        r"\[\s*['\"][A-Za-z0-9_]+['\"]\s*\])\s*\}\}"
+    ),
     scope_keys=(),
     exclude_keys=(),
 ) -> RuleSpec:
@@ -38,6 +41,16 @@ def _spec(
 def _scan(text: str, **kw) -> list:
     wf = parse_workflow(text)
     return HANDLER.match(_spec(scope_keys=("run", "script"), **kw), file=Path("wf.yml"), workflow=wf, raw_text=text)
+
+
+def _scan_with_default_gha_r002(text: str) -> list:
+    spec = next(rule for rule in load_ruleset() if rule.id == "GHA-R002")
+    return HANDLER.match(
+        spec,
+        file=Path("wf.yml"),
+        workflow=parse_workflow(text),
+        raw_text=text,
+    )
 
 
 # ─── true positives ──────────────────────────────────────────────────────────
@@ -82,6 +95,43 @@ class TestSecretsInterpFires:
             "      - run: echo ${{   secrets.X   }}\n"
         )
         assert len(f) == 1 and "secrets.X" in (f[0].location.snippet or "")
+
+    @pytest.mark.parametrize(
+        "expression",
+        (
+            "${{ secrets.DOT_ACCESS }}",
+            "${{ secrets['BRACKET_ACCESS'] }}",
+            '${{ secrets["DOUBLE_QUOTED"] }}',
+        ),
+    )
+    def test_secret_access_syntaxes_fire_with_default_rule(self, expression):
+        f = _scan_with_default_gha_r002(
+            "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            f"      - run: echo {expression}\n"
+        )
+        assert len(f) == 1
+        assert f[0].location.snippet == expression
+
+    def test_folded_block_scalar_reports_physical_secret_line(self):
+        f = _scan(
+            "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            "      - run: >-\n"
+            "          echo first\n"
+            "          echo ${{ secrets.FOLDED }}\n"
+        )
+        assert len(f) == 1
+        assert f[0].location.line == 8
+
+    @pytest.mark.parametrize("header", (">2-", ">-2"))
+    def test_folded_scalar_with_explicit_indent_reports_physical_secret_line(self, header):
+        f = _scan(
+            "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            f"      - run: {header}\n"
+            "          echo first\n"
+            "          echo ${{ secrets.EXPLICIT_INDENT }}\n"
+        )
+        assert len(f) == 1
+        assert f[0].location.line == 8
 
     def test_script_scope_key_also_fires(self):
         f = _scan(

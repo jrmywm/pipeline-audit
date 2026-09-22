@@ -68,7 +68,7 @@ class DockerRegexRule(RuleHandler):
             if inst.instruction_upper not in _ENV_INSTRUCTIONS:
                 continue
             candidates = [(inst.raw, inst.line)]
-            candidates.extend((candidate, inst.line) for candidate in _assignment_candidates(inst))
+            candidates.extend(_assignment_candidates(inst))
             for candidate, candidate_line in candidates:
                 for m in pattern.finditer(candidate):
                     self._evaluate_match(
@@ -158,28 +158,112 @@ class DockerRegexRule(RuleHandler):
         return f"{instruction.instruction_upper} {name}=<redacted>"
 
 
-def _assignment_candidates(instruction) -> list[str]:
-    """Split ENV/ARG assignments so every value is independently scanned."""
-    try:
-        tokens = shlex.split(instruction.args, posix=True)
-    except ValueError:
-        tokens = instruction.args.split()
+def _assignment_candidates(instruction) -> list[tuple[str, int]]:
+    """Split ENV/ARG assignments and retain each assignment's source line.
+
+    Docker permits an ENV instruction to span lines.  Flattened ``args`` are
+    convenient for matching, but lose the line on which later ``NAME=value``
+    pairs occur.  Tokenizing the original instruction keeps the generated
+    candidate independent while pointing a finding at the assignment itself.
+    """
+    raw_tokens = _assignment_tokens_with_lines(instruction)
+    tokens: list[tuple[str, int]] = []
+    for raw_token, line in raw_tokens:
+        try:
+            parsed = shlex.split(raw_token, posix=True)
+        except ValueError:
+            parsed = [raw_token]
+        if parsed:
+            # A shell token produces exactly one logical ENV token.  Keeping
+            # this defensive loop makes malformed quotes fail closed but still
+            # lets straightforward assignments be scanned.
+            tokens.extend((token, line) for token in parsed)
     if not tokens:
         return []
 
-    assignments: list[tuple[str, str]] = []
-    for token in tokens:
+    assignments: list[tuple[str, str, int]] = []
+    for token, line in tokens:
         if "=" in token:
             name, value = token.split("=", 1)
-            assignments.append((name, value))
+            assignments.append((name, value, line))
 
     if not assignments and instruction.instruction_upper == "ENV" and len(tokens) >= 2:
-        assignments.append((tokens[0], " ".join(tokens[1:])))
+        name, line = tokens[0]
+        assignments.append((name, " ".join(token for token, _ in tokens[1:]), line))
 
     return [
-        f"{instruction.instruction_upper} {name}={value}"
-        for name, value in assignments
+        (f"{instruction.instruction_upper} {name}={value}", line)
+        for name, value, line in assignments
     ]
+
+
+def _assignment_tokens_with_lines(instruction) -> list[tuple[str, int]]:
+    """Lex the original ENV/ARG text into tokens paired with their line."""
+    lines = instruction.raw.splitlines()
+    if not lines:
+        return []
+
+    first = re.match(r"\s*\S+(.*)$", lines[0])
+    segments: list[tuple[str, int]] = [(first.group(1) if first else "", instruction.line)]
+    segments.extend((line, instruction.line + index) for index, line in enumerate(lines[1:], 1))
+
+    chars: list[tuple[str, int]] = []
+    escape_char = getattr(instruction, "escape_char", "\\")
+    for index, (segment, line) in enumerate(segments):
+        trimmed = segment.rstrip()
+        if _ends_with_escape(trimmed, escape_char):
+            trimmed = trimmed[:-1]
+        chars.extend((ch, line) for ch in trimmed)
+        if index + 1 < len(segments):
+            # Whitespace joins a Docker continuation without attributing the
+            # next assignment to the preceding source line.
+            chars.append((" ", segments[index + 1][1]))
+
+    tokens: list[tuple[str, int]] = []
+    token: list[str] = []
+    token_line: int | None = None
+    quote: str | None = None
+    i = 0
+    while i < len(chars):
+        ch, line = chars[i]
+        if quote is None and ch.isspace():
+            if token:
+                tokens.append(("".join(token), token_line or line))
+                token = []
+                token_line = None
+            i += 1
+            continue
+
+        if token_line is None:
+            token_line = line
+        token.append(ch)
+        if ch in {"'", '"'}:
+            if quote is None:
+                quote = ch
+            elif quote == ch:
+                quote = None
+        elif ch == "\\" and quote != "'" and i + 1 < len(chars):
+            # Preserve shell escapes and prevent an escaped space/quote from
+            # ending or changing the current token.
+            i += 1
+            escaped, escaped_line = chars[i]
+            token.append(escaped)
+        i += 1
+
+    if token:
+        tokens.append(("".join(token), token_line or instruction.line))
+    return tokens
+
+
+def _ends_with_escape(text: str, escape_char: str) -> bool:
+    if not text.endswith(escape_char):
+        return False
+    count = 0
+    for ch in reversed(text):
+        if ch != escape_char:
+            break
+        count += 1
+    return count % 2 == 1
 
 
 def _is_runtime_reference(value: str) -> bool:

@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline-audit/v1",
+  "generated_at": "2026-09-22T08:34:45+00:00",
+  "summary": {
+    "total": 0,
+    "by_severity": {
+      "Critical": 0,
+      "High": 0,
+      "Medium": 0,
+      "Low": 0
+    }
+  },
+  "findings": []
+}

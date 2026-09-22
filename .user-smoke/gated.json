@@ -1,0 +1,120 @@
+{
+  "schema": "pipeline-audit/v1",
+  "generated_at": "2026-09-22T08:34:44+00:00",
+  "summary": {
+    "total": 7,
+    "by_severity": {
+      "Critical": 1,
+      "High": 4,
+      "Medium": 2,
+      "Low": 0
+    }
+  },
+  "findings": [
+    {
+      "rule_id": "GHA-R002",
+      "title": "GitHub secret interpolated into executable script",
+      "severity": "High",
+      "target": "github_workflow",
+      "file": ".github/workflows/bad.yml",
+      "line": 12,
+      "end_line": null,
+      "column": null,
+      "snippet": "${{ secrets.DEPLOY_TOKEN }}",
+      "remediation": "Pass secrets to the step via the `env:` mapping and reference them as `$VAR_NAME` inside the bash script. Never interpolate `${{ secrets.* }}` directly into a run block.",
+      "references": [
+        "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-secrets-securely"
+      ]
+    },
+    {
+      "rule_id": "GHA-R002",
+      "title": "GitHub secret interpolated into executable script",
+      "severity": "High",
+      "target": "github_workflow",
+      "file": ".github/workflows/bad.yml",
+      "line": 13,
+      "end_line": null,
+      "column": null,
+      "snippet": "${{ secrets.DEPLOY_TOKEN }}",
+      "remediation": "Pass secrets to the step via the `env:` mapping and reference them as `$VAR_NAME` inside the bash script. Never interpolate `${{ secrets.* }}` directly into a run block.",
+      "references": [
+        "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-secrets-securely"
+      ]
+    },
+    {
+      "rule_id": "GHA-R001",
+      "title": "Unpinned GitHub Action (uses tag or branch instead of SHA)",
+      "severity": "Medium",
+      "target": "github_workflow",
+      "file": ".github/workflows/bad.yml",
+      "line": 9,
+      "end_line": null,
+      "column": null,
+      "snippet": "uses: actions/checkout@v4",
+      "remediation": "Pin the action to a full 40-character commit SHA instead of a tag or branch reference, e.g. `uses: actions/checkout@<40-hex-sha>`.",
+      "references": [
+        "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions"
+      ]
+    },
+    {
+      "rule_id": "GHA-R001",
+      "title": "Unpinned GitHub Action (uses tag or branch instead of SHA)",
+      "severity": "Medium",
+      "target": "github_workflow",
+      "file": ".github/workflows/bad.yml",
+      "line": 22,
+      "end_line": null,
+      "column": null,
+      "snippet": "uses: actions/checkout@main",
+      "remediation": "Pin the action to a full 40-character commit SHA instead of a tag or branch reference, e.g. `uses: actions/checkout@<40-hex-sha>`.",
+      "references": [
+        "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions"
+      ]
+    },
+    {
+      "rule_id": "DOCKER-R002",
+      "title": "Hardcoded secret in ENV or ARG instruction",
+      "severity": "Critical",
+      "target": "dockerfile",
+      "file": "Dockerfile",
+      "line": 5,
+      "end_line": null,
+      "column": null,
+      "snippet": "ENV API_KEY=<redacted>",
+      "remediation": "Move secrets out of the image layer. Inject at runtime via Vault, GitHub secrets, docker secrets, or SOPS-encrypted files.",
+      "references": [
+        "https://docs.github.com/en/actions/security-guides/encrypted-secrets"
+      ]
+    },
+    {
+      "rule_id": "DOCKER-R001",
+      "title": "Final container stage may run as root",
+      "severity": "High",
+      "target": "dockerfile",
+      "file": "Dockerfile",
+      "line": 2,
+      "end_line": 12,
+      "column": null,
+      "snippet": "# syntax=docker/dockerfile:1.6",
+      "remediation": "Add a USER instruction near the end of the Dockerfile to specify a non-root user, e.g. `USER 1001` or `USER appuser`.",
+      "references": [
+        "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user"
+      ]
+    },
+    {
+      "rule_id": "DOCKER-R001",
+      "title": "Final container stage may run as root",
+      "severity": "High",
+      "target": "dockerfile",
+      "file": "vendor/Dockerfile",
+      "line": 1,
+      "end_line": 2,
+      "column": null,
+      "snippet": "FROM scratch",
+      "remediation": "Add a USER instruction near the end of the Dockerfile to specify a non-root user, e.g. `USER 1001` or `USER appuser`.",
+      "references": [
+        "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user"
+      ]
+    }
+  ]
+}

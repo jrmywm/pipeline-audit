@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from re import _parser as _sre_parser
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -30,6 +31,7 @@ class Rule:
 
 SCHEMA_RESOURCE = "schema.json"
 DEFAULT_RULESET_RESOURCE = "default.yaml"
+MAX_REGEX_PATTERN_LENGTH = 4096
 
 _yaml = YAML(typ="safe")
 
@@ -163,10 +165,208 @@ def _validate_string_list(
 def _compile_pattern(rule_id: str, pattern: Any) -> re.Pattern:
     if not isinstance(pattern, str) or not pattern:
         raise RulesetValidationError(f"{rule_id}: regex pattern must be a non-empty string")
+    if len(pattern) > MAX_REGEX_PATTERN_LENGTH:
+        raise RulesetValidationError(
+            f"{rule_id}: regex pattern exceeds the {MAX_REGEX_PATTERN_LENGTH}-character limit"
+        )
     try:
-        return re.compile(pattern)
+        compiled = re.compile(pattern)
     except re.error as exc:
         raise RulesetValidationError(f"{rule_id}: invalid regex pattern: {exc}") from exc
+    _validate_regex_safety(rule_id, pattern)
+    return compiled
+
+
+def _validate_regex_safety(rule_id: str, pattern: str) -> None:
+    """Reject regex constructs that can make Python's backtracking engine unsafe.
+
+    Ruleset expressions run over repository-controlled text.  The standard
+    library ``re`` engine has no timeout, so a short malicious expression can
+    otherwise consume unbounded CPU.  This deliberately conservative check
+    blocks the established catastrophic forms while retaining normal matching
+    features such as groups, character classes, anchors, and disjoint choices.
+    """
+    parsed = _sre_parser.parse(pattern, 0)
+    reason = _unsafe_regex_reason(parsed.data)
+    if reason:
+        raise RulesetValidationError(f"{rule_id}: unsafe regex pattern: {reason}")
+
+
+def _unsafe_regex_reason(tokens: list[tuple[Any, Any]]) -> str | None:
+    """Return an explanation when a parsed pattern has ambiguous repetition."""
+    repeat_ops = {
+        _sre_parser.MAX_REPEAT,
+        _sre_parser.MIN_REPEAT,
+        getattr(_sre_parser, "POSSESSIVE_REPEAT", object()),
+    }
+    groupref_ops = {
+        _sre_parser.GROUPREF,
+        _sre_parser.GROUPREF_EXISTS,
+        getattr(_sre_parser, "GROUPREF_IGNORE", object()),
+        getattr(_sre_parser, "GROUPREF_LOC_IGNORE", object()),
+        getattr(_sre_parser, "GROUPREF_UNI_IGNORE", object()),
+    }
+
+    previous_unbounded: tuple[set[int] | None, bool] | None = None
+    for op, value in tokens:
+        if op in groupref_ops:
+            return "backreferences are not supported"
+
+        nested = _unsafe_regex_reason(_child_tokens(op, value))
+        if nested:
+            return nested
+
+        if op in repeat_ops:
+            minimum, maximum, repeated = value
+            repeated_tokens = list(repeated)
+            if _contains_ambiguous_repeat(repeated_tokens, repeat_ops):
+                return "nested repetition can cause catastrophic backtracking"
+            if maximum == _sre_parser.MAXREPEAT:
+                branch_reason = _ambiguous_branch_reason(repeated_tokens)
+                if branch_reason:
+                    return branch_reason
+                first = _first_characters(repeated_tokens)
+                if (
+                    previous_unbounded
+                    and previous_unbounded[1]
+                    and minimum == 0
+                    and _first_sets_overlap(previous_unbounded[0], first)
+                ):
+                    return "adjacent unbounded repetitions can match the same text"
+                previous_unbounded = (first, minimum == 0)
+                continue
+
+        if not _can_match_empty([(op, value)]):
+            previous_unbounded = None
+    return None
+
+
+def _child_tokens(op: Any, value: Any) -> list[tuple[Any, Any]]:
+    """Extract nested subpatterns for recursive safety checks."""
+    if op is _sre_parser.SUBPATTERN:
+        return list(value[-1])
+    if op in {_sre_parser.MAX_REPEAT, _sre_parser.MIN_REPEAT, getattr(_sre_parser, "POSSESSIVE_REPEAT", object())}:
+        return list(value[2])
+    if op is _sre_parser.BRANCH:
+        return [token for branch in value[1] for token in branch]
+    if op in {_sre_parser.ASSERT, _sre_parser.ASSERT_NOT}:
+        return list(value[1])
+    return []
+
+
+def _contains_ambiguous_repeat(tokens: list[tuple[Any, Any]], repeat_ops: set[Any]) -> bool:
+    for op, value in tokens:
+        if op in repeat_ops:
+            minimum, maximum, _ = value
+            if minimum != maximum:
+                return True
+        if _contains_ambiguous_repeat(_child_tokens(op, value), repeat_ops):
+            return True
+    return False
+
+
+def _ambiguous_branch_reason(tokens: list[tuple[Any, Any]]) -> str | None:
+    """Detect alternatives that a repeated group could partition ambiguously."""
+    for op, value in tokens:
+        if op is _sre_parser.BRANCH:
+            branches = [list(branch) for branch in value[1]]
+            if any(_can_match_empty(branch) for branch in branches):
+                return "a repeated alternation contains an empty alternative"
+            literal_branches = [_literal_sequence(branch) for branch in branches]
+            if all(branch is not None for branch in literal_branches):
+                for index, branch in enumerate(literal_branches):
+                    if any(
+                        branch.startswith(other) or other.startswith(branch)
+                        for other in literal_branches[index + 1 :]
+                    ):
+                        return "a repeated alternation has overlapping alternatives"
+            else:
+                first_sets = [_first_characters(branch) for branch in branches]
+                for index, first in enumerate(first_sets):
+                    if any(_first_sets_overlap(first, other) for other in first_sets[index + 1 :]):
+                        return "a repeated alternation has overlapping alternatives"
+        child_reason = _ambiguous_branch_reason(_child_tokens(op, value))
+        if child_reason:
+            return child_reason
+    return None
+
+
+def _can_match_empty(tokens: list[tuple[Any, Any]]) -> bool:
+    for op, value in tokens:
+        if op in {_sre_parser.LITERAL, _sre_parser.NOT_LITERAL, _sre_parser.IN, _sre_parser.ANY, _sre_parser.CATEGORY}:
+            return False
+        if op is _sre_parser.SUBPATTERN and not _can_match_empty(list(value[-1])):
+            return False
+        if op in {_sre_parser.MAX_REPEAT, _sre_parser.MIN_REPEAT, getattr(_sre_parser, "POSSESSIVE_REPEAT", object())}:
+            minimum, _, repeated = value
+            if minimum and not _can_match_empty(list(repeated)):
+                return False
+        if op is _sre_parser.BRANCH and not any(_can_match_empty(list(branch)) for branch in value[1]):
+            return False
+    return True
+
+
+def _literal_sequence(tokens: list[tuple[Any, Any]]) -> str | None:
+    """Return a branch's fixed literal text, or None when it varies by input."""
+    characters: list[str] = []
+    for op, value in tokens:
+        if op is _sre_parser.LITERAL:
+            characters.append(chr(value))
+        elif op is _sre_parser.SUBPATTERN:
+            nested = _literal_sequence(list(value[-1]))
+            if nested is None:
+                return None
+            characters.append(nested)
+        elif op not in {_sre_parser.AT, _sre_parser.ASSERT, _sre_parser.ASSERT_NOT}:
+            return None
+    return "".join(characters)
+
+
+def _first_characters(tokens: list[tuple[Any, Any]]) -> set[int] | None:
+    """Return literal first characters, or None when the set is not finite."""
+    result: set[int] = set()
+    for op, value in tokens:
+        if op is _sre_parser.LITERAL:
+            result.add(value)
+            return result
+        if op is _sre_parser.IN:
+            literals = {item for inner_op, item in value if inner_op is _sre_parser.LITERAL}
+            if len(literals) != len(value):
+                return None
+            return result | literals
+        if op in {_sre_parser.NOT_LITERAL, _sre_parser.ANY, _sre_parser.CATEGORY}:
+            return None
+        if op is _sre_parser.SUBPATTERN:
+            first = _first_characters(list(value[-1]))
+            if first is None:
+                return None
+            result.update(first)
+            if not _can_match_empty(list(value[-1])):
+                return result
+            continue
+        if op is _sre_parser.BRANCH:
+            branch_firsts = [_first_characters(list(branch)) for branch in value[1]]
+            if any(first is None for first in branch_firsts):
+                return None
+            for first in branch_firsts:
+                result.update(first or set())
+            if not any(_can_match_empty(list(branch)) for branch in value[1]):
+                return result
+            continue
+        if op in {_sre_parser.MAX_REPEAT, _sre_parser.MIN_REPEAT, getattr(_sre_parser, "POSSESSIVE_REPEAT", object())}:
+            minimum, _, repeated = value
+            first = _first_characters(list(repeated))
+            if first is None:
+                return None
+            result.update(first)
+            if minimum:
+                return result
+    return result
+
+
+def _first_sets_overlap(left: set[int] | None, right: set[int] | None) -> bool:
+    """Unknown character classes are treated as overlapping for safety."""
+    return left is None or right is None or bool(left & right)
 
 
 def _rule_from_dict(r: dict[str, Any]) -> Rule:

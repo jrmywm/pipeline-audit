@@ -1,0 +1,256 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cs01/schemas/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "pipeline-audit",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/jrmywm/pipeline-audit",
+          "rules": [
+            {
+              "id": "GHA-R002",
+              "name": "GHA-R002",
+              "shortDescription": {
+                "text": "GitHub secret interpolated into executable script"
+              },
+              "fullDescription": {
+                "text": "Pass secrets to the step via the `env:` mapping and reference them as `$VAR_NAME` inside the bash script. Never interpolate `${{ secrets.* }}` directly into a run block."
+              },
+              "helpUri": "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-secrets-securely",
+              "help": {
+                "text": "Pass secrets to the step via the `env:` mapping and reference them as `$VAR_NAME` inside the bash script. Never interpolate `${{ secrets.* }}` directly into a run block."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "GHA-R001",
+              "name": "GHA-R001",
+              "shortDescription": {
+                "text": "Unpinned GitHub Action (uses tag or branch instead of SHA)"
+              },
+              "fullDescription": {
+                "text": "Pin the action to a full 40-character commit SHA instead of a tag or branch reference, e.g. `uses: actions/checkout@<40-hex-sha>`."
+              },
+              "helpUri": "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions",
+              "help": {
+                "text": "Pin the action to a full 40-character commit SHA instead of a tag or branch reference, e.g. `uses: actions/checkout@<40-hex-sha>`."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "DOCKER-R002",
+              "name": "DOCKER-R002",
+              "shortDescription": {
+                "text": "Hardcoded secret in ENV or ARG instruction"
+              },
+              "fullDescription": {
+                "text": "Move secrets out of the image layer. Inject at runtime via Vault, GitHub secrets, docker secrets, or SOPS-encrypted files."
+              },
+              "helpUri": "https://docs.github.com/en/actions/security-guides/encrypted-secrets",
+              "help": {
+                "text": "Move secrets out of the image layer. Inject at runtime via Vault, GitHub secrets, docker secrets, or SOPS-encrypted files."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DOCKER-R001",
+              "name": "DOCKER-R001",
+              "shortDescription": {
+                "text": "Final container stage may run as root"
+              },
+              "fullDescription": {
+                "text": "Add a USER instruction near the end of the Dockerfile to specify a non-root user, e.g. `USER 1001` or `USER appuser`."
+              },
+              "helpUri": "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user",
+              "help": {
+                "text": "Add a USER instruction near the end of the Dockerfile to specify a non-root user, e.g. `USER 1001` or `USER appuser`."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "GHA-R002",
+          "level": "error",
+          "message": {
+            "text": "GitHub secret interpolated into executable script",
+            "markdown": "${{ secrets.DEPLOY_TOKEN }}"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/bad.yml"
+                },
+                "region": {
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "cbecd30d87360e9f0ed20535749ab2915a5fa5c9e5a92b96b274a64757ab7a9d"
+          }
+        },
+        {
+          "ruleId": "GHA-R002",
+          "level": "error",
+          "message": {
+            "text": "GitHub secret interpolated into executable script",
+            "markdown": "${{ secrets.DEPLOY_TOKEN }}"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/bad.yml"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "cbecd30d87360e9f0ed20535749ab2915a5fa5c9e5a92b96b274a64757ab7a9d"
+          }
+        },
+        {
+          "ruleId": "GHA-R001",
+          "level": "warning",
+          "message": {
+            "text": "Unpinned GitHub Action (uses tag or branch instead of SHA)",
+            "markdown": "uses: actions/checkout@v4"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/bad.yml"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "78a615b8f3a2e38c665cc14f61c6f0819abc726e6cae3491bb4f31add159c409"
+          }
+        },
+        {
+          "ruleId": "GHA-R001",
+          "level": "warning",
+          "message": {
+            "text": "Unpinned GitHub Action (uses tag or branch instead of SHA)",
+            "markdown": "uses: actions/checkout@main"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/bad.yml"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "a7d215dfddd27c4f2a9f3ea4f01a37076f4b86901df7cd4ba2307bc47561cce5"
+          }
+        },
+        {
+          "ruleId": "DOCKER-R002",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded secret in ENV or ARG instruction",
+            "markdown": "ENV API_KEY=<redacted>"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Dockerfile"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fbf0c06aab7100892e9155ae3de46f09946a75d8412640db4cf25049793bac49"
+          }
+        },
+        {
+          "ruleId": "DOCKER-R001",
+          "level": "error",
+          "message": {
+            "text": "Final container stage may run as root",
+            "markdown": "# syntax=docker/dockerfile:1.6"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Dockerfile"
+                },
+                "region": {
+                  "startLine": 2,
+                  "endLine": 12
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "0f22c9c3451d09514d3715ddee0db0d175b3ec8ec064ce3d88aeb5a504c19105"
+          }
+        },
+        {
+          "ruleId": "DOCKER-R001",
+          "level": "error",
+          "message": {
+            "text": "Final container stage may run as root",
+            "markdown": "FROM scratch"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "vendor/Dockerfile"
+                },
+                "region": {
+                  "startLine": 1,
+                  "endLine": 2
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "f7d6f054b4f195c36a8677ac858fb3a2f20be7efd87976e4808e8faa6831c8a3"
+          }
+        }
+      ],
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-09-22T08:34:44+00:00"
+        }
+      ]
+    }
+  ]
+}

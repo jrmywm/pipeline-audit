@@ -1,0 +1,12 @@
+version: "1.0"
+rules:
+  - id: GHA-R099
+    title: Unsafe expression
+    severity: High
+    target: github_workflow
+    type: regex
+    match:
+      regex:
+        pattern: "^(a+)+$"
+        scope_keys: [run]
+    remediation: Use a safe expression.

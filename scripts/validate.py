@@ -50,9 +50,26 @@ class MatchResult:
 
 def _load_expected(path: Path) -> dict[str, dict]:
     yaml = YAML(typ="safe")
-    with path.open("r", encoding="utf-8") as f:
-        data = yaml.load(f)
-    return {name: snap for name, snap in data.get("snapshots", {}).items()}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml.load(f)
+    except Exception as exc:
+        raise ValueError(f"Failed to parse expected YAML {path}: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError("Expected YAML root must be a mapping")
+    snapshots = data.get("snapshots")
+    if not isinstance(snapshots, dict):
+        raise ValueError("Expected YAML snapshots must be a mapping")
+    for name, snapshot in snapshots.items():
+        if not isinstance(name, str) or not isinstance(snapshot, dict):
+            raise ValueError("Expected YAML snapshots must map names to mappings")
+        expected = snapshot.get("expected", [])
+        if not isinstance(expected, list):
+            raise ValueError(f"Expected YAML snapshot {name!r} has a non-list expected field")
+        if any(not isinstance(entry, dict) for entry in expected):
+            raise ValueError(f"Expected YAML snapshot {name!r} has a non-mapping expected entry")
+    return snapshots
 
 
 def _normalize_findings(findings, snapshot_dir: Path) -> list[tuple[str, str, str]]:

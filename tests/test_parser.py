@@ -81,6 +81,51 @@ class TestDockerfileParser:
         assert runs[0].end_line == 4
         assert "apt-get install -y curl" in runs[0].args
 
+    @pytest.mark.parametrize("directive", ["# escape=\\", "# escape=`"])
+    def test_escape_directive_controls_continuations(self, directive):
+        escape_char = directive[-1]
+        text = (
+            f"{directive}\n"
+            "FROM alpine\n"
+            f"RUN echo first {escape_char}\n"
+            "    echo second\n"
+        )
+        result = parse_dockerfile(text)
+        runs = [i for i in result.instructions if i.instruction_upper == "RUN"]
+        assert len(runs) == 1
+        assert runs[0].line == 3
+        assert runs[0].end_line == 4
+        assert runs[0].args == "echo first echo second"
+        assert runs[0].escape_char == escape_char
+
+    def test_quoted_heredoc_body_is_not_parsed_as_instructions(self):
+        text = (
+            "FROM alpine\n"
+            "RUN <<'SCRIPT'\n"
+            "ENV API_KEY=not-a-docker-instruction\n"
+            "SCRIPT\n"
+            "ENV API_KEY=real-docker-instruction\n"
+        )
+        result = parse_dockerfile(text)
+        assert result.parse_errors == []
+        names = [i.instruction_upper for i in result.instructions if not i.is_directive]
+        assert names == ["FROM", "RUN", "ENV"]
+        run = next(i for i in result.instructions if i.instruction_upper == "RUN")
+        assert run.end_line == 4
+
+    def test_tab_stripped_quoted_heredoc_body_is_not_parsed_as_instructions(self):
+        text = (
+            "FROM alpine\n"
+            'RUN <<-"SCRIPT"\n'
+            "\tARG API_TOKEN=not-a-docker-instruction\n"
+            "\tSCRIPT\n"
+            "ARG API_TOKEN=real-docker-instruction\n"
+        )
+        result = parse_dockerfile(text)
+        assert result.parse_errors == []
+        names = [i.instruction_upper for i in result.instructions if not i.is_directive]
+        assert names == ["FROM", "RUN", "ARG"]
+
     def test_comment_lines_skipped(self):
         text = "# a comment\n# another\nFROM alpine\n"
         result = parse_dockerfile(text)

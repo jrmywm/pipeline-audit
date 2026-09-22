@@ -139,6 +139,20 @@ class TestMalformedRuleset:
             load_ruleset(p)
 
     @pytest.mark.parametrize(
+        ("ruleset", "message"),
+        [
+            ('version: "2.0"\nrules: []\n', "'1.0' was expected"),
+            ('version: "1.0"\nrules: []\n', "should be non-empty"),
+        ],
+    )
+    def test_rejects_unsupported_version_and_empty_rules(self, tmp_path, ruleset, message):
+        path = tmp_path / "invalid_ruleset.yaml"
+        path.write_text(ruleset, encoding="utf-8")
+
+        with pytest.raises(RulesetValidationError, match=message):
+            load_ruleset(path)
+
+    @pytest.mark.parametrize(
         ("target", "regex_config", "message"),
         [
             ("github_workflow", "scope_keys: run", "scope_keys"),
@@ -172,6 +186,65 @@ class TestMalformedRuleset:
         )
         with pytest.raises(RulesetValidationError, match=message):
             load_ruleset(p)
+
+    @pytest.mark.parametrize(
+        ("pattern", "message"),
+        [
+            ("^(a+)+$", "nested repetition"),
+            ("^(a|aa)+$", "empty alternative"),
+            ("^.*.*X$", "adjacent unbounded"),
+        ],
+    )
+    def test_unsafe_regex_patterns_are_rejected(self, tmp_path, pattern, message):
+        path = tmp_path / "unsafe_regex.yaml"
+        path.write_text(
+            textwrap.dedent(f"""\
+            version: "1.0"
+            rules:
+              - id: DOCKER-R099
+                title: Unsafe regex
+                severity: High
+                target: dockerfile
+                type: regex
+                match:
+                  regex:
+                    pattern: '{pattern}'
+                remediation: fix it
+            """),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(RulesetValidationError, match=message):
+            load_ruleset(path)
+
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            r"(?i)\b(?:token|secret)\s+(\S+)",
+            r"((?:ab|ac)+)",
+            r"(ab{2})+",
+        ],
+    )
+    def test_safe_custom_regex_is_accepted(self, tmp_path, pattern):
+        path = tmp_path / "safe_regex.yaml"
+        path.write_text(
+            textwrap.dedent(f"""\
+            version: "1.0"
+            rules:
+              - id: DOCKER-R099
+                title: Custom regex
+                severity: High
+                target: dockerfile
+                type: regex
+                match:
+                  regex:
+                    pattern: '{pattern}'
+                remediation: fix it
+            """),
+            encoding="utf-8",
+        )
+
+        assert load_ruleset(path)[0].id == "DOCKER-R099"
 
 
 # ─── merge behaviour ──────────────────────────────────────────────────────────

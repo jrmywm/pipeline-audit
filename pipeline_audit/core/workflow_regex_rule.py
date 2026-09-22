@@ -157,16 +157,24 @@ class WorkflowRegexRule(RuleHandler):
             return
 
         base_line = wf.line_of(*path)
+        source_line_map = self._block_scalar_source_line_map(wf, base_line)
 
-        # Block scalars (`|` / `>`) start the value on the line *after*
-        # the key line.
-        if base_line is not None and self._is_block_scalar(wf, base_line):
-            base_line += 1
+        # Block scalar values are decoded by YAML before we scan them.  In
+        # particular, folded scalars turn many physical line breaks into
+        # spaces, so counting newlines in ``value`` alone cannot recover the
+        # source location.  The map retains the source line of each decoded
+        # character.
+        if source_line_map is not None:
+            base_line = None
 
         # Count newlines in the value to resolve multi-line matches.
         for m in pattern.finditer(value):
             offset = value.count("\n", 0, m.start())
-            line = (base_line or 1) + offset
+            line = (
+                source_line_map[m.start()]
+                if source_line_map is not None and m.start() < len(source_line_map)
+                else (base_line or 1) + offset
+            )
             findings.append(
                 Finding(
                     rule_id=spec.id,
@@ -181,12 +189,83 @@ class WorkflowRegexRule(RuleHandler):
                 )
             )
 
-    def _is_block_scalar(self, wf: ParsedWorkflow, key_line: int) -> bool:
-        if 1 <= key_line <= len(wf.raw_lines):
-            line = wf.raw_lines[key_line - 1].rstrip()
-            # The key line ends with a block scalar indicator (`|` or `>`).
-            # We cheaply check for a trailing `:` followed by the indicator.
-            return bool(re.search(r":\s*[|>][\+\-]?\s*$", line))
-        return False
+    def _block_scalar_source_line_map(
+        self, wf: ParsedWorkflow, key_line: int | None
+    ) -> list[int] | None:
+        """Return decoded-character-to-source-line offsets for a block scalar.
+
+        ``ParsedWorkflow`` intentionally keeps only the parsed data, its key
+        locations, and the raw source lines.  This reconstructs enough YAML
+        block-scalar semantics from those structures to locate regex matches:
+        literal scalars preserve line breaks, while folded scalars fold ordinary
+        line breaks but preserve those around blank or more-indented lines.
+        """
+        if key_line is None or not 1 <= key_line <= len(wf.raw_lines):
+            return None
+
+        header = self._parse_block_scalar_header(wf.raw_lines[key_line - 1])
+        if header is None:
+            return None
+        style, explicit_indent, parent_indent = header
+
+        content: list[tuple[str, int, int]] = []
+        for index in range(key_line, len(wf.raw_lines)):
+            raw_line = wf.raw_lines[index]
+            stripped = raw_line.strip()
+            indentation = len(raw_line) - len(raw_line.lstrip(" "))
+            if stripped and indentation <= parent_indent:
+                break
+            content.append((raw_line, index + 1, indentation))
+
+        non_blank_indents = [indent for raw, _, indent in content if raw.strip()]
+        if not non_blank_indents:
+            return []
+        content_indent = (
+            parent_indent + explicit_indent
+            if explicit_indent is not None
+            else min(non_blank_indents)
+        )
+
+        lines = [
+            (raw[content_indent:] if len(raw) >= content_indent else "", line, indent)
+            for raw, line, indent in content
+        ]
+        line_map: list[int] = []
+        for index, (text, line, indentation) in enumerate(lines):
+            line_map.extend([line] * len(text))
+            if index == len(lines) - 1:
+                continue
+
+            next_text, _, next_indentation = lines[index + 1]
+            if style == "|":
+                separator = "\n"
+            elif not text:
+                # A run of N blank source lines becomes N newlines.  The
+                # preceding non-blank-to-blank boundary contributes nothing.
+                separator = "\n"
+            elif not next_text:
+                separator = ""
+            elif indentation > content_indent or next_indentation > content_indent:
+                separator = "\n"
+            else:
+                separator = " "
+            line_map.extend([line] * len(separator))
+        return line_map
+
+    @staticmethod
+    def _parse_block_scalar_header(
+        line: str,
+    ) -> tuple[str, int | None, int] | None:
+        """Parse a mapping value header such as ``run: >2- # comment``."""
+        match = re.match(
+            r"^(?P<indent> *)(?:-\s+)?(?P<key>.*?)\s*:\s*(?P<style>[|>])"
+            r"(?P<indicators>[1-9+\-]*)(?:\s*(?:#.*)?)?$",
+            line,
+        )
+        if match is None:
+            return None
+        indicators = match.group("indicators")
+        indentation = next((int(char) for char in indicators if char.isdigit()), None)
+        return match.group("style"), indentation, match.start("key")
 
 __all__ = ["WorkflowRegexRule"]
