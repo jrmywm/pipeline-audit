@@ -16,11 +16,11 @@ from pipeline_audit.core.severity import Severity
 class TestBundledRuleset:
     def test_loads_without_error(self):
         rules = load_ruleset()
-        assert len(rules) == 4
+        assert len(rules) == 8
 
     def test_rule_ids(self):
         rules = {r.id: r for r in load_ruleset()}
-        assert set(rules.keys()) == {"DOCKER-R001", "DOCKER-R002", "GHA-R001", "GHA-R002"}
+        assert set(rules.keys()) == {"DOCKER-R001", "DOCKER-R002", "GHA-R001", "GHA-R002", "GHA-R003", "GHA-R004", "GHA-R005", "GHA-R006"}
 
     def test_docker_r001_fields(self):
         rules = {r.id: r for r in load_ruleset()}
@@ -253,7 +253,7 @@ class TestMalformedRuleset:
 class TestMergedRuleset:
     def test_no_user_path_returns_default(self):
         rules = load_merged_ruleset(None)
-        assert len(rules) == 4
+        assert len(rules) == 8
 
     def test_user_overrides_default_by_id(self, tmp_path):
         p = tmp_path / "custom.yaml"
@@ -275,7 +275,7 @@ class TestMergedRuleset:
             encoding="utf-8",
         )
         rules = {r.id: r for r in load_merged_ruleset(p)}
-        assert len(rules) == 4
+        assert len(rules) == 8
         r = rules["DOCKER-R001"]
         assert r.severity == Severity.CRITICAL
         assert r.title == "Custom override"
@@ -301,4 +301,4 @@ class TestMergedRuleset:
         )
         rules = {r.id: r for r in load_merged_ruleset(p)}
         assert "DOCKER-R099" in rules
-        assert len(rules) == 5
+        assert len(rules) == 9

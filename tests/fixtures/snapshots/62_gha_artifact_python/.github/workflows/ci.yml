@@ -1,0 +1,15 @@
+name: run downloaded python
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: bundle
+      - run: python3 bundle/publish.py

@@ -1,0 +1,9 @@
+name: broad job token
+on: push
+permissions: read-all
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - run: echo ok

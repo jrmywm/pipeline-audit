@@ -8,8 +8,10 @@ for supported structural checks and regex signatures.
 ## Features
 
 - **Externalized YAML ruleset** — add regex signatures or tune supported rules
-- **4 built-in rules** covering root containers, hardcoded secrets, unpinned
-  actions, and secret interpolation in run blocks
+- **8 built-in rules** covering root containers, hardcoded secrets, unpinned
+  actions, broad token permissions, unsafe interpolation, and privileged
+  execution after checking out pull request code, and execution of downloaded
+  workflow artifacts
 - **Three output formats** — Markdown (human review), JSON (CI ingestion),
   SARIF 2.1.0 (GitHub Code Scanning)
 - **Nested `.gitignore`-aware traversal** — skips ignored paths throughout the tree, while still scanning tracked security configurations
@@ -25,6 +27,24 @@ for supported structural checks and regex signatures.
 | `DOCKER-R002` | Critical | Dockerfile | Hardcoded secret in `ENV`/`ARG` (regex + allowlist + optional entropy threshold) |
 | `GHA-R001` | Medium | Workflow | Unpinned action (tag/branch ref instead of 40-hex SHA) |
 | `GHA-R002` | High | Workflow | `${{ secrets.* }}` interpolated into `run` or nested `script` bodies |
+| `GHA-R003` | High | Workflow | Explicit `permissions: write-all` at workflow or job level |
+| `GHA-R004` | High | Workflow | Selected untrusted GitHub event fields interpolated into `run` or nested `script` bodies |
+| `GHA-R005` | High | Workflow | `pull_request_target` job executes a step after explicitly checking out pull request code |
+| `GHA-R006` | High | Workflow | `workflow_run` job directly executes a file downloaded from its triggering run |
+
+The script-injection rule covers pull request and issue titles/bodies, comment
+bodies, commit messages, discussion titles/bodies, release names/bodies, and
+head refs. Pass event text through `env:` rather than placing expressions
+directly in executable script text. These rules detect specific risky patterns;
+they are not a comprehensive security audit of every workflow feature.
+
+The privileged-checkout rule requires a same-job `run` or local-action step
+after checkout. It does not currently trace artifacts, reusable workflows, or
+indirect refs.
+
+The artifact rule currently tracks an explicit relative download path and
+direct execution commands in the same job. It does not resolve shell variables,
+artifact provenance beyond the triggering run, or indirect imports.
 
 ## Quickstart
 
@@ -92,8 +112,7 @@ fully-pinned working example.
 ## Example report
 
 A sample report from a known-bad fixture repo is at
-[`samples/example_report.md`](./samples/example_report.md) — 7 findings across
-all 4 rules.
+[`samples/example_report.md`](./samples/example_report.md).
 
 ## Status
 

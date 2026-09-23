@@ -84,3 +84,68 @@ rules:
       directly into a run block.
     references:
       - https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-secrets-securely
+
+  - id: GHA-R003
+    title: Workflow grants all GITHUB_TOKEN permissions write access
+    severity: High
+    target: github_workflow
+    type: structural
+    match:
+      structural:
+        kind: permissions_write_all
+    remediation: >
+      Replace permissions: write-all with the specific permissions each job
+      requires. Grant read access by default and write access only where needed.
+    references:
+      - https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
+
+  - id: GHA-R004
+    title: Untrusted GitHub event text interpolated into executable script
+    severity: High
+    target: github_workflow
+    type: regex
+    match:
+      regex:
+        pattern: '\$\{\{\s*github\.(?:head_ref|event\.(?:pull_request\.(?:title|body|head\.ref)|issue\.(?:title|body)|comment\.body|head_commit\.message|discussion\.(?:title|body)|release\.(?:name|body)))\s*\}\}'
+        scope_keys:
+          - run
+          - script
+        exclude_keys:
+          - env
+    remediation: >
+      Pass untrusted event data through an env variable and quote the variable
+      in the script. Do not interpolate event text directly into run or script.
+    references:
+      - https://docs.github.com/en/actions/concepts/security/script-injections
+
+  - id: GHA-R005
+    title: Privileged pull request workflow executes after untrusted checkout
+    severity: High
+    target: github_workflow
+    type: structural
+    match:
+      structural:
+        kind: privileged_pr_checkout_execution
+    remediation: >
+      Do not run pull request code in a pull_request_target job. Use the
+      unprivileged pull_request event for build and test work. If privileged
+      automation is needed, keep untrusted code out of its execution path.
+    references:
+      - https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target
+      - https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
+
+  - id: GHA-R006
+    title: Privileged workflow executes an artifact from its triggering run
+    severity: High
+    target: github_workflow
+    type: structural
+    match:
+      structural:
+        kind: workflow_run_artifact_execution
+    remediation: >
+      Treat artifacts from a triggering workflow as untrusted data. Do not
+      execute downloaded files in a workflow_run job with privileged token or
+      secret access. Separate unprivileged execution from privileged actions.
+    references:
+      - https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run
+      - https://securitylab.github.com/resources/github-actions-new-patterns-and-mitigations/

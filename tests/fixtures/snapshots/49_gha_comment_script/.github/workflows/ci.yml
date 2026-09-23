@@ -1,0 +1,10 @@
+name: comment script
+on: issue_comment
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: example/action@0123456789abcdef0123456789abcdef01234567
+        with:
+          script: |
+            const text = "${{ github.event.comment.body }}";

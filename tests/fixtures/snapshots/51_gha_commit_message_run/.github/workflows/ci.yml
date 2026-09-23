@@ -1,0 +1,7 @@
+name: message check
+on: push
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ github.event.head_commit.message }}"

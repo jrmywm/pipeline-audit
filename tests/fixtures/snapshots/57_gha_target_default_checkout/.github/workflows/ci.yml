@@ -1,0 +1,8 @@
+name: trusted base checkout
+on: pull_request_target
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - run: make test

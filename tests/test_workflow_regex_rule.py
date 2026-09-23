@@ -53,6 +53,34 @@ def _scan_with_default_gha_r002(text: str) -> list:
     )
 
 
+def _scan_untrusted_context(text: str, **kw) -> list:
+    """Scan executable values with the GHA-R004 untrusted-context pattern."""
+    pattern = kw.pop(
+        "pattern",
+        r"\$\{\{\s*(?:github\.event\.(?:issue\.title|pull_request\.(?:title|body)|head_commit\.message)|github\.head_ref)\s*\}\}",
+    )
+    spec = RuleSpec(
+        id="GHA-R004",
+        title="Untrusted GitHub event context interpolated into executable script",
+        severity=Severity.HIGH,
+        target="github_workflow",
+        type="regex",
+        match={
+            "regex": {
+                "pattern": pattern,
+                "scope_keys": ["run", "script"],
+                "exclude_keys": ["env"],
+                **kw,
+            }
+        },
+        remediation="Pass untrusted context through an environment variable and validate it before use.",
+        references=["https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions"],
+    )
+    return HANDLER.match(
+        spec, file=Path("wf.yml"), workflow=parse_workflow(text), raw_text=text
+    )
+
+
 # ─── true positives ──────────────────────────────────────────────────────────
 
 
@@ -163,6 +191,60 @@ class TestNoFire:
             "        run: echo $TOKEN\n"
         )
         assert f == []
+
+
+class TestUntrustedEventContext:
+    @pytest.mark.parametrize(
+        "expression",
+        (
+            "github.event.issue.title",
+            "github.event.pull_request.title",
+            "github.event.pull_request.body",
+            "github.head_ref",
+            "github.event.head_commit.message",
+        ),
+    )
+    def test_untrusted_context_in_run_fires_once(self, expression):
+        workflow = (
+            "on: pull_request\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            f"      - run: echo '${{{{ {expression} }}}}'\n"
+        )
+        findings = _scan_untrusted_context(workflow)
+        assert len(findings) == 1
+        assert findings[0].rule_id == "GHA-R004"
+        assert expression in (findings[0].location.snippet or "")
+
+    def test_script_scope_and_block_scalar_location(self):
+        workflow = (
+            "on: pull_request\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            "      - uses: actions/github-script@v7\n"
+            "        with:\n"
+            "          script: |\n"
+            "            console.log('${{ github.event.pull_request.body }}')\n"
+        )
+        findings = _scan_untrusted_context(workflow)
+        assert len(findings) == 1
+        assert findings[0].location.line == 9
+
+    def test_repeated_expression_is_reported_once_per_occurrence(self):
+        workflow = (
+            "on: pull_request\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            "      - run: |\n"
+            "          echo '${{ github.head_ref }}'\n"
+            "          echo '${{ github.head_ref }}'\n"
+        )
+        findings = _scan_untrusted_context(workflow)
+        assert len(findings) == 2
+        assert [finding.location.line for finding in findings] == [7, 8]
+
+    def test_context_passed_via_env_only_is_safe(self):
+        workflow = (
+            "on: pull_request\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n"
+            "      - env:\n"
+            "          TITLE: ${{ github.event.issue.title }}\n"
+            "        run: echo \"$TITLE\"\n"
+        )
+        assert _scan_untrusted_context(workflow) == []
 
     def test_run_with_env_var_reference_only(self):
         f = _scan(

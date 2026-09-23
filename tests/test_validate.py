@@ -23,7 +23,7 @@ class TestExpectedYaml:
     def test_loads_cleanly(self):
         data = _load_expected()
         assert "snapshots" in data
-        assert len(data["snapshots"]) == 40
+        assert len(data["snapshots"]) == 67
 
     def test_all_snapshot_dirs_exist(self):
         data = _load_expected()
@@ -74,6 +74,10 @@ class TestExpectedYaml:
             "DOCKER-R002",
             "GHA-R001",
             "GHA-R002",
+            "GHA-R003",
+            "GHA-R004",
+            "GHA-R005",
+            "GHA-R006",
         ]
         for rule_id in known_rules:
             assert tp_by_rule[rule_id] >= 5, (

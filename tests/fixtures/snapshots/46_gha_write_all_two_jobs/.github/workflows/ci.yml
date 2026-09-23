@@ -1,0 +1,13 @@
+name: one broad job
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: read-all
+    steps:
+      - run: echo build
+  publish:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - run: echo publish

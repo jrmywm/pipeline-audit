@@ -1,0 +1,12 @@
+name: inspect artifact data
+on: workflow_run
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: bundle
+      - run: cat bundle/pr_number

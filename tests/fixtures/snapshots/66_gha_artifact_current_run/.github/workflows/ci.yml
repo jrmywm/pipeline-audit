@@ -1,0 +1,10 @@
+name: own artifact
+on: workflow_run
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        with:
+          path: bundle
+      - run: bash bundle/script.sh

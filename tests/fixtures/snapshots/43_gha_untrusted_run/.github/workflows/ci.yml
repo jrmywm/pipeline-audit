@@ -1,0 +1,10 @@
+name: title check
+on: pull_request
+permissions: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          title="${{ github.event.pull_request.title }}"
+          echo "$title"

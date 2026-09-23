@@ -216,3 +216,145 @@ snapshots:
   40_gha_empty_run_block:
     description: "Workflow with run: \"\" empty string step"
     expected: []
+
+  41_gha_write_all_workflow:
+    description: "Workflow grants every GITHUB_TOKEN scope write access"
+    expected:
+      - rule_id: GHA-R003
+        file: ci.yml
+        severity: High
+  42_gha_write_all_job:
+    description: "One job grants every GITHUB_TOKEN scope write access"
+    expected:
+      - rule_id: GHA-R003
+        file: ci.yml
+        severity: High
+  43_gha_untrusted_run:
+    description: "Pull request title interpolated directly into run script"
+    expected:
+      - rule_id: GHA-R004
+        file: ci.yml
+        severity: High
+  44_gha_untrusted_env_safe:
+    description: "Pull request title passed through env instead of interpolation"
+    expected: []
+  45_gha_write_all_quoted:
+    description: "Quoted uppercase write-all at workflow level"
+    expected:
+      - rule_id: GHA-R003
+        file: ci.yml
+        severity: High
+  46_gha_write_all_two_jobs:
+    description: "One write-all job beside a read-only job"
+    expected:
+      - rule_id: GHA-R003
+        file: ci.yml
+        severity: High
+  47_gha_write_all_with_override:
+    description: "Workflow write-all is reported even when a job narrows it"
+    expected:
+      - rule_id: GHA-R003
+        file: ci.yml
+        severity: High
+  48_gha_issue_title_run:
+    description: "Issue title interpolated into run script"
+    expected:
+      - rule_id: GHA-R004
+        file: ci.yml
+        severity: High
+  49_gha_comment_script:
+    description: "Comment body interpolated into nested script"
+    expected:
+      - rule_id: GHA-R004
+        file: ci.yml
+        severity: High
+  50_gha_head_ref_run:
+    description: "Untrusted head ref interpolated into run script"
+    expected:
+      - rule_id: GHA-R004
+        file: ci.yml
+        severity: High
+  51_gha_commit_message_run:
+    description: "Commit message interpolated into run script"
+    expected:
+      - rule_id: GHA-R004
+        file: ci.yml
+        severity: High
+  52_gha_target_head_sha_run:
+    description: "Privileged job executes after PR head SHA checkout"
+    expected:
+      - rule_id: GHA-R005
+        file: ci.yml
+        severity: High
+  53_gha_target_head_ref_run:
+    description: "Privileged job executes after PR head ref checkout"
+    expected:
+      - rule_id: GHA-R005
+        file: ci.yml
+        severity: High
+  54_gha_target_fork_repo_run:
+    description: "Privileged job executes after fork repository checkout"
+    expected:
+      - rule_id: GHA-R005
+        file: ci.yml
+        severity: High
+  55_gha_target_merge_ref_run:
+    description: "Privileged job executes after PR merge ref checkout"
+    expected:
+      - rule_id: GHA-R005
+        file: ci.yml
+        severity: High
+  56_gha_target_head_local_action:
+    description: "Privileged job runs local action after PR checkout"
+    expected:
+      - rule_id: GHA-R005
+        file: ci.yml
+        severity: High
+  57_gha_target_default_checkout:
+    description: "Default checkout uses trusted base context"
+    expected: []
+  58_gha_target_checkout_only:
+    description: "PR checkout without later execution"
+    expected: []
+  59_gha_pr_head_checkout:
+    description: "Unprivileged pull request job checks out PR head"
+    expected: []
+  60_gha_artifact_bash:
+    description: "Privileged workflow runs shell script from triggering run"
+    expected:
+      - rule_id: GHA-R006
+        file: ci.yml
+        severity: High
+  61_gha_artifact_node:
+    description: "Privileged workflow runs JavaScript from triggering run"
+    expected:
+      - rule_id: GHA-R006
+        file: ci.yml
+        severity: High
+  62_gha_artifact_python:
+    description: "Privileged workflow runs Python from triggering run"
+    expected:
+      - rule_id: GHA-R006
+        file: ci.yml
+        severity: High
+  63_gha_artifact_direct:
+    description: "Privileged workflow executes downloaded binary"
+    expected:
+      - rule_id: GHA-R006
+        file: ci.yml
+        severity: High
+  64_gha_artifact_source:
+    description: "Privileged workflow sources downloaded shell script"
+    expected:
+      - rule_id: GHA-R006
+        file: ci.yml
+        severity: High
+  65_gha_artifact_data_only:
+    description: "Privileged workflow reads artifact as data"
+    expected: []
+  66_gha_artifact_current_run:
+    description: "Artifact is not selected from triggering run"
+    expected: []
+  67_gha_artifact_unprivileged:
+    description: "Unprivileged pull_request workflow"
+    expected: []

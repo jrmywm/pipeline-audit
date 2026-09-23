@@ -1,0 +1,8 @@
+name: quoted broad permissions
+on: push
+permissions: "WRITE-ALL"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

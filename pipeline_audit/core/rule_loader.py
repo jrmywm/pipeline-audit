@@ -88,7 +88,12 @@ def _validate_semantics(data: dict[str, Any]) -> None:
             kind = structural.get("kind")
             supported = {
                 "dockerfile": {"missing_instruction"},
-                "github_workflow": {"uses_unpinned"},
+                "github_workflow": {
+                    "uses_unpinned",
+                    "permissions_write_all",
+                    "privileged_pr_checkout_execution",
+                    "workflow_run_artifact_execution",
+                },
             }
             if kind not in supported[target]:
                 raise RulesetValidationError(

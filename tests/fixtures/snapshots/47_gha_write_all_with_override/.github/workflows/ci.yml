@@ -1,0 +1,10 @@
+name: broad default with narrow job
+on: push
+permissions: write-all
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: echo build

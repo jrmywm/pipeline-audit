@@ -39,3 +39,6 @@ audit_report.sarif
 
 # Local planning doc (kept locally for AI context, not pushed)
 PLAN.md
+
+# Personal agent instructions
+AGENTS.md
